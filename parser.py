@@ -16,6 +16,9 @@ if not API_KEY:
 CHANNEL_STREAMS_URL = 'https://www.youtube.com/@kvashenaya/streams'
 DB_FILE = "parsed_streams_db.json"
 OUTPUT_HTML = "index.html"
+SITE_URL = "https://kvash9.github.io/arh/"
+SITEMAP_FILE = "sitemap.xml"
+ROBOTS_FILE = "robots.txt"
 
 NEW_STREAMS_TO_CHECK = 999
 MAX_WORKERS = 4
@@ -342,17 +345,116 @@ def parse_single_video(video_entry):
     return True
 
 
-def generate_html_report():
-    print("Генерация статического index.html...")
+def generate_robots():
+    robots = f"""User-agent: *
+Allow: /
 
-    html_template = r"""<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Архив трансляций Квашеной</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
-    <style>
+Sitemap: {SITE_URL}sitemap.xml
+"""
+    with open(ROBOTS_FILE, "w", encoding="utf-8") as f:
+        f.write(robots)
+    print("[robots.txt создан]")
+
+
+def generate_sitemap(db):
+    import html
+    urls = [f"""
+<url>
+    <loc>{SITE_URL}</loc>
+    <priority>1.0</priority>
+</url>
+"""]
+    for video in db.values():
+        raw = video.get("raw_date", "00000000")
+        lastmod = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" if len(raw) == 8 else None
+        lastmod_tag = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
+        urls.append(f"""
+<url>
+    <loc>{SITE_URL}#video-{video['id']}</loc>
+    {lastmod_tag}
+    <priority>0.8</priority>
+</url>
+""")
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{''.join(urls)}
+</urlset>"""
+    with open(SITEMAP_FILE, "w", encoding="utf-8") as f:
+        f.write(xml)
+    print("[sitemap.xml создан]")
+
+
+def generate_html_report(db):
+    import html
+    print("Генерация статического index.html с серверным рендерингом...")
+
+    # Сортировка по дате (новые сверху)
+    sorted_videos = sorted(db.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+
+    # Генерация карточек стримов и сбор всех песен для SEO-блока
+    streams_html_parts = []
+    all_songs = set()
+
+    def timecode_seconds(line):
+        m = re.search(r'\b(\d{1,2}:\d{2}(?::\d{2})?)\b', line)
+        if not m:
+            return 99999999
+        parts = [int(p) for p in m.group(1).split(':')]
+        if len(parts) == 3:
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        return parts[0] * 60 + parts[1]
+
+    for v in sorted_videos:
+        v_id = v['id']
+        title = html.escape(v.get('title', 'Без названия'))
+        date = v.get('date', 'Неизвестно')
+        raw_year = v.get('raw_date', '0000')[:4]
+        timecodes = v.get('timecodes', [])
+        list_type = v.get('list_type', 'none')
+        author = v.get('author', '')
+
+        sorted_tc = sorted(timecodes, key=timecode_seconds)
+        tc_items = []
+        for line in sorted_tc:
+            m = re.search(r'\b(\d{1,2}:\d{2}(?::\d{2})?)\b', line)
+            if m:
+                time_str = m.group(1)
+                parts = [int(x) for x in time_str.split(':')]
+                normalized = f"{parts[0]:02d}:{parts[1]:02d}:{parts[2]:02d}" if len(parts) == 3 else f"00:{parts[0]:02d}:{parts[1]:02d}"
+                song_name = line[m.end():].strip().lstrip('-–— ')
+                song_name_esc = html.escape(song_name)
+                tc_items.append(
+                    f'<div class="tc-item"><span class="t-click" data-time="{time_str}">{normalized}</span><span class="s-title">{song_name_esc}</span></div>'
+                )
+                all_songs.add(song_name_esc)
+            else:
+                song_esc = html.escape(line)
+                tc_items.append(f'<div class="tc-item"><span class="s-title">{song_esc}</span></div>')
+                all_songs.add(song_esc)
+
+        if author:
+            tc_items.append(f'<div class="tc-author">Автор треклиста: {html.escape(author)}</div>')
+
+        badge_class = f'badge-{list_type}' if list_type in ('tracklist', 'mixed') else 'hide'
+        badge_text = 'Готовый трек-лист' if list_type == 'tracklist' else ('Сборный список' if list_type == 'mixed' else '')
+        tcs_html = ''
+        if timecodes:
+            tcs_html = f'''<details><summary><div class="summary-flex"><span>Треклист {len(sorted_tc)}</span><span class="badge {badge_class}">{badge_text}</span></div></summary><div class="tc-list">{"".join(tc_items)}</div></details>'''
+        else:
+            tcs_html = '<div class="no-tc-block"><span>Треклист не найден</span></div>'
+
+        thumb = f"https://img.youtube.com/vi/{v_id}/hqdefault.jpg"
+        row = f'''<div class="row" data-id="{v_id}" data-year="{raw_year}" style="--bg-thumb: url('{thumb}');"><span class="v-date">{date}</span><a class="v-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="{thumb}" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank"><span class="v-title">{title}</span></a><div class="v-tcs">{tcs_html}</div></div></div>'''
+        streams_html_parts.append(row)
+
+    streams_html = "\n".join(streams_html_parts)
+    seo_songs_html = "\n".join(f"<li>{song}</li>" for song in sorted(all_songs))
+
+    # Встроенный JSON для клиентского поиска
+    streams_json = json.dumps(sorted_videos, ensure_ascii=False)
+
+    # Полный CSS из исходного шаблона (вставляется через плейсхолдер)
+    full_css = r"""
         :root {
             --primary: #6366f1;
             --primary-hover: #4f46e5;
@@ -446,6 +548,42 @@ def generate_html_report():
         .no-tcs-box { padding: 4px 0; }
         .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
         @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
+    """
+
+    # Итоговый HTML с серверным рендерингом и клиентской логикой
+    final_html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Архив трансляций Квашеной — поиск песен по стримам</title>
+    <meta name="description" content="Полный архив стримов Квашеной с таймкодами и треклистами. Поиск песен по всем трансляциям.">
+    <meta name="keywords" content="Квашеная, стримы Квашеной, песни Квашеной, треклист, таймкоды">
+    <meta name="robots" content="index,follow,max-image-preview:large">
+    <link rel="canonical" href="https://kvash9.github.io/arh/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Архив трансляций Квашеной">
+    <meta property="og:url" content="https://kvash9.github.io/arh/">
+    <meta property="og:description" content="Поиск песен по всем стримам Квашеной">
+    <meta property="og:image" content="https://kvash9.github.io/arh/preview.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">
+    {{
+        "@context":"https://schema.org",
+        "@type":"WebSite",
+        "url":"https://kvash9.github.io/arh/",
+        "name":"Архив трансляций Квашеной",
+        "description":"Архив стримов Квашеной с таймкодами песен",
+        "potentialAction":{{
+            "@type":"SearchAction",
+            "target":"https://kvash9.github.io/arh/?q={{search_term_string}}",
+            "query-input":"required name=search_term_string"
+        }}
+    }}
+    </script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+    <style>
+        {full_css}
     </style>
 </head>
 <body>
@@ -465,405 +603,304 @@ def generate_html_report():
 <div class="container">
     <div id="yearFilters" class="year-filters"></div>
     <div class="grid" id="mainGrid">
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        {streams_html}
     </div>
 </div>
+<div class="seo-block" style="position:absolute;left:-99999px;top:auto;width:1px;height:1px;overflow:hidden;">
+    <h2>Все песни из стримов Квашеной</h2>
+    <ul>
+        {seo_songs_html}
+    </ul>
+</div>
 <button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
+<script type="application/json" id="streams-data-json">
+{streams_json}
+</script>
 <script>
-(function() {
+(function() {{
     const notesContainer = document.getElementById('parallaxNotes');
-    if (!notesContainer) return;
-    const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
-    const notesCount = 10;
-    const notes = [];
-    for (let i = 0; i < notesCount; i++) {
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'note';
-        const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
-        const size = Math.floor(Math.random() * 130) + 50;
-        const left = Math.random() * 100;
-        const top = Math.random() * 100;
-        const opacity = Math.random() * 0.4 + 0.2;
-        const rotation = Math.random() * 360;
-        const parallaxFactor = 0.2 + Math.random() * 0.6;
-        const contentSpan = document.createElement('span');
-        contentSpan.className = 'note-content';
-        contentSpan.textContent = symbol;
-        contentSpan.style.fontSize = size + 'px';
-        contentSpan.style.opacity = opacity;
-        contentSpan.style.color = `rgba(255, 255, 255, ${opacity * 0.9})`;
-        const animDuration = 4 + Math.random() * 6;
-        contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
-        contentSpan.style.animationDelay = `${Math.random() * 3}s`;
-        noteDiv.appendChild(contentSpan);
-        noteDiv.style.left = left + '%';
-        noteDiv.style.top = top + '%';
-        noteDiv.style.transform = `rotate(${rotation}deg)`;
-        notesContainer.appendChild(noteDiv);
-        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
-    }
-    let ticking = false;
-    function updateNotesPosition() {
-        const scrollY = window.scrollY;
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
-        for (let n of notes) {
-            const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
-            let newTop = n.baseTop + shiftPercent;
-            newTop = Math.min(Math.max(newTop, -5), 105);
-            n.element.style.top = newTop + '%';
-        }
-        ticking = false;
-    }
-    window.addEventListener('scroll', () => { if (!ticking) { requestAnimationFrame(updateNotesPosition); ticking = true; } });
-    window.addEventListener('resize', () => updateNotesPosition());
-    updateNotesPosition();
-})();
+    if (notesContainer) {{
+        const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
+        const notesCount = 10;
+        const notes = [];
+        for (let i = 0; i < notesCount; i++) {{
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'note';
+            const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
+            const size = Math.floor(Math.random() * 130) + 50;
+            const left = Math.random() * 100;
+            const top = Math.random() * 100;
+            const opacity = Math.random() * 0.4 + 0.2;
+            const rotation = Math.random() * 360;
+            const parallaxFactor = 0.2 + Math.random() * 0.6;
+            const contentSpan = document.createElement('span');
+            contentSpan.className = 'note-content';
+            contentSpan.textContent = symbol;
+            contentSpan.style.fontSize = size + 'px';
+            contentSpan.style.opacity = opacity;
+            contentSpan.style.color = `rgba(255, 255, 255, ${{opacity * 0.9}})`;
+            const animDuration = 4 + Math.random() * 6;
+            contentSpan.style.animation = `gentleFloat ${{animDuration}}s infinite ease-in-out`;
+            contentSpan.style.animationDelay = `${{Math.random() * 3}}s`;
+            noteDiv.appendChild(contentSpan);
+            noteDiv.style.left = left + '%';
+            noteDiv.style.top = top + '%';
+            noteDiv.style.transform = `rotate(${{rotation}}deg)`;
+            notesContainer.appendChild(noteDiv);
+            notes.push({{ element: noteDiv, baseTop: parseFloat(top), parallaxFactor }});
+        }}
+        let ticking = false;
+        function updateNotesPosition() {{
+            const scrollY = window.scrollY;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
+            for (let n of notes) {{
+                const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
+                let newTop = n.baseTop + shiftPercent;
+                newTop = Math.min(Math.max(newTop, -5), 105);
+                n.element.style.top = newTop + '%';
+            }}
+            ticking = false;
+        }}
+        window.addEventListener('scroll', () => {{ if (!ticking) {{ requestAnimationFrame(updateNotesPosition); ticking = true; }} }});
+        window.addEventListener('resize', () => updateNotesPosition());
+        updateNotesPosition();
+    }}
 
-// ========== БЕЗОПАСНОЕ УДАЛЕНИЕ ТОЛЬКО ЭМОДЗИ ==========
-function removeSpecificEmojis(str) {
-    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-        const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
-        const segments = [...segmenter.segment(str)];
-        let result = '';
-        for (const seg of segments) {
-            const grapheme = seg.segment;
-            const isEmoji = /\p{Emoji}/u.test(grapheme) && !/[\p{N}\p{L}]/u.test(grapheme);
-            if (!isEmoji) {
-                result += grapheme;
-            }
-        }
-        return result;
-    } else {
-        return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu, '');
-    }
-}
+    function removeSpecificEmojis(str) {{
+        if (typeof Intl !== 'undefined' && Intl.Segmenter) {{
+            const segmenter = new Intl.Segmenter('en', {{ granularity: 'grapheme' }});
+            const segments = [...segmenter.segment(str)];
+            let result = '';
+            for (const seg of segments) {{
+                const grapheme = seg.segment;
+                const isEmoji = /\\p{{Emoji}}/u.test(grapheme) && !/[\\p{{N}}\\p{{L}}]/u.test(grapheme);
+                if (!isEmoji) result += grapheme;
+            }}
+            return result;
+        }} else {{
+            return str.replace(/[\\u{{1F600}}-\\u{{1F64F}}\\u{{1F300}}-\\u{{1F5FF}}\\u{{1F680}}-\\u{{1F6FF}}\\u{{1F1E0}}-\\u{{1F1FF}}\\u{{2600}}-\\u{{26FF}}\\u{{2700}}-\\u{{27BF}}\\u{{1F900}}-\\u{{1F9FF}}\\u{{1FA00}}-\\u{{1FA6F}}\\u{{1FA70}}-\\u{{1FAFF}}]/gu, '');
+        }}
+    }}
+    function normalize(str) {{
+        return str.toLowerCase().replace(/ë/g, 'e').replace(/[^a-zа-яё0-9]/g, '');
+    }}
+    const SYNONYMS = {{
+        "noizemc": ["noizemc", "noizemc", "нойзмс", "нойзмс", "noize", "нойз"],
+        "rammstein": ["rammstein", "раммштайн"],
+        "корольишут": ["корольишут", "киш"],
+        "витас": ["витас", "vitas"],
+        "ladygaga": ["ladygaga", "ледигага"],
+        "максим": ["максим", "макsим"],
+        "fleur": ["fleur", "flëur"],
+        "nautiluspompilius": ["nautiluspompilius", "наутилуспомпилиус", "pompilius", "nautilus", "наутилус", "помпилиус"],
+        "океанэлзи": ["океанэлзи", "элзи", "океанэльзы", "эльзы", "океанельзи", "ельзи"]
+    }};
+    const variantToCanon = new Map();
+    for (const [canon, variants] of Object.entries(SYNONYMS)) {{
+        for (const v of variants) variantToCanon.set(v, canon);
+    }}
+    function getSearchVariants(query) {{
+        const normQuery = normalize(query);
+        if (variantToCanon.has(normQuery)) {{
+            const canon = variantToCanon.get(normQuery);
+            return SYNONYMS[canon];
+        }}
+        return [normQuery];
+    }}
+    function matchesWithVariants(textNorm, variants) {{
+        for (let v of variants) if (textNorm.includes(normalize(v))) return true;
+        return false;
+    }}
+    function highlightFirstMatch(original, variants) {{
+        if (!variants || variants.length === 0) return original;
+        const normOriginal = normalize(original);
+        let bestMatch = null, bestIndex = Infinity;
+        for (let v of variants) {{
+            const idx = normOriginal.indexOf(v);
+            if (idx !== -1 && idx < bestIndex) {{ bestIndex = idx; bestMatch = v; }}
+        }}
+        if (bestMatch === null) return original;
+        let origIdx = 0, normIdx = 0;
+        while (normIdx < bestIndex && origIdx < original.length) {{
+            const ch = original[origIdx], nch = normalize(ch);
+            if (nch.length > 0) normIdx++;
+            origIdx++;
+        }}
+        const startOrig = origIdx;
+        while (normIdx < bestIndex + bestMatch.length && origIdx < original.length) {{
+            const ch = original[origIdx], nch = normalize(ch);
+            if (nch.length > 0) normIdx++;
+            origIdx++;
+        }}
+        const endOrig = origIdx;
+        return original.substring(0, startOrig) + '<mark>' + original.substring(startOrig, endOrig) + '</mark>' + original.substring(endOrig);
+    }}
 
-// ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
-function normalize(str) {
-    return str.toLowerCase()
-              .replace(/ë/g, 'e')
-              .replace(/[^a-zа-яё0-9]/g, '');
-}
+    function getTimecodeSeconds(line) {{
+        const match = line.match(/(\\d{{1,2}}:\\d{{2}}(?::\\d{{2}})?)/);
+        if (!match) return 99999999;
+        const parts = match[1].split(':').map(Number);
+        if (parts.length === 2) return parts[0]*60 + parts[1];
+        if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+        return 99999999;
+    }}
 
-const SYNONYMS = {
-    "noizemc": ["noizemc", "noizemc", "нойзмс", "нойзмс", "noize", "нойз"],
-    "rammstein": ["rammstein", "раммштайн"],
-    "корольишут": ["корольишут", "киш"],
-    "витас": ["витас", "vitas"],
-    "ladygaga": ["ladygaga", "ледигага"],
-    "максим": ["максим", "макsим"],
-    "fleur": ["fleur", "flëur"],
-    "nautiluspompilius": ["nautiluspompilius", "наутилуспомпилиус", "pompilius", "nautilus", "наутилус", "помпилиус"],
-    "океанэлзи": ["океанэлзи", "элзи", "океанэльзы", "эльзы", "океанельзи", "ельзи"]
-};
+    const streamsData = JSON.parse(document.getElementById('streams-data-json').textContent);
+    const searchIndex = [];
+    streamsData.forEach(entry => {{
+        const vId = entry.id;
+        const timecodes = entry.timecodes || [];
+        timecodes.forEach(line => {{
+            const match = line.match(/(\\d{{1,2}}:\\d{{2}}(?::\\d{{2}})?)/);
+            let s = line;
+            if (match) s = line.replace(match[1], '').trim().replace(/^[-–—]\\s*/, '');
+            s = removeSpecificEmojis(s);
+            searchIndex.push({{ id: vId, text: s, norm: normalize(s) }});
+        }});
+    }});
 
-const variantToCanon = new Map();
-for (const [canon, variants] of Object.entries(SYNONYMS)) {
-    for (const v of variants) {
-        variantToCanon.set(v, canon);
-    }
-}
+    let activeYear = 'all';
+    let currentFilter = '';
+    const searchInput = document.getElementById('sInput');
+    const clearBtn = document.getElementById('sClear');
+    const statsEl = document.getElementById('searchStats');
 
-function getSearchVariants(query) {
-    const normQuery = normalize(query);
-    if (variantToCanon.has(normQuery)) {
-        const canon = variantToCanon.get(normQuery);
-        return SYNONYMS[canon];
-    }
-    return [normQuery];
-}
+    function renderTracklist(vId, container, filter) {{
+        const entry = streamsData.find(e => e.id === vId);
+        if (!entry) return;
+        const timecodes = entry.timecodes || [];
+        const sorted = [...timecodes].sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
+        let html = '';
+        const variants = filter ? getSearchVariants(filter) : [];
+        sorted.forEach(line => {{
+            const timeMatch = line.match(/(\\d{{1,2}}:\\d{{2}}(?::\\d{{2}})?)/);
+            let timeStr = '', normalizedTime = '', song = '';
+            if (timeMatch) {{
+                timeStr = timeMatch[1];
+                const parts = timeStr.split(':').map(Number);
+                normalizedTime = parts.length === 2 ? `00:${{parts[0].toString().padStart(2,'0')}}:${{parts[1].toString().padStart(2,'0')}}` : parts.map(p => p.toString().padStart(2,'0')).join(':');
+                song = line.substring(timeMatch[0].length).trim().replace(/^[-–—]\\s*/, '');
+            }} else {{
+                song = line;
+            }}
+            song = removeSpecificEmojis(song);
+            let displaySong = song;
+            if (filter && variants.length > 0) {{
+                const normSong = normalize(song);
+                if (matchesWithVariants(normSong, variants)) displaySong = highlightFirstMatch(song, variants);
+            }}
+            if (timeStr) {{
+                html += `<div class="tc-item"><span class="t-click" data-time="${{timeStr}}">${{normalizedTime}}</span><span class="s-title">${{displaySong}}</span></div>`;
+            }} else {{
+                html += `<div class="tc-item"><span class="s-title">${{displaySong}}</span></div>`;
+            }}
+        }});
+        const author = entry.author || '';
+        if (author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${{author}}</div>`;
+        container.innerHTML = html;
+    }}
 
-function matchesWithVariants(textNorm, variants) {
-    for (let v of variants) {
-        const normVariant = normalize(v);
-        if (textNorm.includes(normVariant)) return true;
-    }
-    return false;
-}
-
-function highlightFirstMatch(original, variants) {
-    if (!variants || variants.length === 0) return original;
-    const normOriginal = normalize(original);
-    let bestMatch = null;
-    let bestIndex = Infinity;
-    for (let v of variants) {
-        const idx = normOriginal.indexOf(v);
-        if (idx !== -1 && idx < bestIndex) {
-            bestIndex = idx;
-            bestMatch = v;
-        }
-    }
-    if (bestMatch === null) return original;
-    let origIdx = 0, normIdx = 0;
-    while (normIdx < bestIndex && origIdx < original.length) {
-        const ch = original[origIdx];
-        const nch = normalize(ch);
-        if (nch.length > 0) normIdx++;
-        origIdx++;
-    }
-    const startOrig = origIdx;
-    while (normIdx < bestIndex + bestMatch.length && origIdx < original.length) {
-        const ch = original[origIdx];
-        const nch = normalize(ch);
-        if (nch.length > 0) normIdx++;
-        origIdx++;
-    }
-    const endOrig = origIdx;
-    return original.substring(0, startOrig) + '<mark>' + original.substring(startOrig, endOrig) + '</mark>' + original.substring(endOrig);
-}
-
-let streamsData = [];
-let songsDB = {};
-let searchIndex = [];
-let activeYear = 'all';
-let allRows = [];
-
-function getTimecodeSeconds(line) {
-    const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-    if (!match) return 99999999;
-    const parts = match[1].split(':').map(Number);
-    if (parts.length === 2) return parts[0]*60 + parts[1];
-    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
-    return 99999999;
-}
-
-function normalizeTimecode(tc) {
-    const parts = tc.split(':').map(Number);
-    if (parts.length === 2) return `00:${parts[0].toString().padStart(2,'0')}:${parts[1].toString().padStart(2,'0')}`;
-    if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
-    return tc;
-}
-
-async function loadDatabase() {
-    if (streamsData.length > 0) return;
-    try {
-        const response = await fetch('parsed_streams_db.json');
-        if (!response.ok) throw new Error('Файл базы не найден');
-        const rawData = await response.json();
-        rawData.sort((a,b) => (b.raw_date || '00000000').localeCompare(a.raw_date || '00000000'));
-        streamsData = rawData;
-        songsDB = {};
-        searchIndex = [];
-        rawData.forEach(entry => {
-            const vId = entry.id;
-            const timecodes = entry.timecodes || [];
-            const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
-            const tracks = sorted.map(line => {
-                const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-                if (match) {
-                    let s = line.replace(match[1], '').trim();
-                    s = s.replace(/^[-–—]\s*/, '');
-                    s = removeSpecificEmojis(s);
-                    return { t: match[1], s: s };
-                } else {
-                    let s = line;
-                    s = removeSpecificEmojis(s);
-                    return { s: s };
-                }
-            });
-            songsDB[vId] = { tracks, author: entry.author || '' };
-            tracks.forEach(tr => {
-                const norm = normalize(tr.s || '');
-                searchIndex.push({ id: vId, text: tr.s, norm: norm });
-            });
-        });
-    } catch(e) { console.error('Ошибка загрузки базы:', e); streamsData = []; }
-}
-
-function renderStreamHTML(stream) {
-    const vId = stream.id;
-    const title = stream.title || 'Без названия';
-    const date = stream.date || 'Неизвестно';
-    const rawYear = (stream.raw_date || '0000').substring(0,4);
-    const timecodes = stream.timecodes || [];
-    const listType = stream.list_type || 'none';
-    const hasTracks = timecodes.length > 0;
-    const badgeClass = (listType === 'tracklist' || listType === 'mixed') ? `badge-${listType}` : 'hide';
-    const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
-    const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${timecodes.length}</span><span class="badge ${badgeClass}">${badgeText}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
-    return `<div class="row" data-id="${vId}" data-year="${rawYear}" style="--bg-thumb: url('https://img.youtube.com/vi/${vId}/hqdefault.jpg');"><span class="v-date">${date}</span><a class="v-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${vId}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><span class="v-title">${title}</span></a><div class="v-tcs">${tcsHTML}</div></div></div>`;
-}
-
-function animateContainer(container) {
-    container.style.transition = 'none';
-    container.style.opacity = '0';
-    container.style.transform = 'translateY(-10px)';
-    void container.offsetHeight;
-    container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-    container.style.opacity = '1';
-    container.style.transform = 'translateY(0)';
-}
-
-function renderAllStreams() {
-    const grid = document.getElementById('mainGrid');
-    grid.innerHTML = streamsData.map(renderStreamHTML).join('');
-    allRows = [...grid.querySelectorAll('.row')];
-    document.querySelectorAll('details').forEach(details => {
-        details.addEventListener('toggle', function() {
-            const container = this.querySelector('.tc-list');
-            if (!container) return;
-            if (this.open) {
-                const row = this.closest('.row');
-                const vId = row.getAttribute('data-id');
-                const filter = searchInput.value.toLowerCase().trim();
-                if (container.children.length === 0) renderTracklist(vId, container, filter);
-                animateContainer(container);
-                if (filter) {
-                    setTimeout(() => {
-                        const mark = container.querySelector('mark');
-                        if (mark) {
-                            const item = mark.closest('.tc-item');
-                            if (item) container.scrollTop = item.offsetTop - container.offsetTop - 10;
-                        }
-                    }, 50);
-                }
-            } else {
-                container.style.transition = 'none';
-                container.style.opacity = '0';
-                container.style.transform = 'translateY(-10px)';
-            }
-        });
-    });
-}
-
-function initYearFilters() {
-    const yearsSet = new Set();
-    allRows.forEach(row => { const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); });
-    const sortedYears = Array.from(yearsSet).sort().reverse();
-    const container = document.getElementById('yearFilters');
-    let html = '<button class="year-btn active" data-year="all">Все годы</button>';
-    sortedYears.forEach(y => html += `<button class="year-btn" data-year="${y}">${y} года</button>`);
-    container.innerHTML = html;
-    container.addEventListener('click', (e) => {
-        if(e.target.classList.contains('year-btn')) {
-            document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            activeYear = e.target.getAttribute('data-year');
-            executeSearch(searchInput.value.toLowerCase().trim());
-        }
-    });
-}
-
-function renderTracklist(vId, container, filter) {
-    const tracks = songsDB[vId]?.tracks || [];
-    let html = '';
-    if (filter) {
-        const variants = getSearchVariants(filter);
-        tracks.forEach(tr => {
-            let sText = tr.s;
-            const normText = normalize(sText);
-            if (matchesWithVariants(normText, variants)) {
-                sText = highlightFirstMatch(sText, variants);
-            }
-            const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${sText}</span></div>` : `<div class="tc-item"><span class="s-title">${sText}</span></div>`;
-        });
-    } else {
-        tracks.forEach(tr => {
-            const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${tr.s}</span></div>` : `<div class="tc-item"><span class="s-title">${tr.s}</span></div>`;
-        });
-    }
-    const author = songsDB[vId]?.author;
-    if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${author}</div>`;
-    container.innerHTML = html;
-}
-
-const searchInput = document.getElementById('sInput');
-const clearBtn = document.getElementById('sClear');
-const statsEl = document.getElementById('searchStats');
-
-async function executeSearch(filter) {
-    if (allRows.length === 0) return;
-    let visibleCount = 0;
-    const variants = filter ? getSearchVariants(filter) : [];
-    clearBtn.style.display = filter ? 'flex' : 'none';
-    allRows.forEach(row => {
-        row.style.display = 'none';
-        const details = row.querySelector('details');
-        if (details) {
-            details.open = false;
-            const tcList = details.querySelector('.tc-list');
-            if (tcList) { tcList.style.transition = 'none'; tcList.style.opacity = '0'; tcList.style.transform = 'translateY(-10px)'; tcList.innerHTML = ''; }
-        }
-    });
-    if (!filter) {
-        allRows.forEach(row => { const rowYear = row.getAttribute('data-year'); if (activeYear === 'all' || rowYear === activeYear) { row.style.display = ''; visibleCount++; } });
-        statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
-        return;
-    }
-    const matchedIds = new Set();
-    searchIndex.forEach(item => {
-        if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id);
-    });
-    const isDesktop = window.innerWidth > 768;
-    allRows.forEach(row => {
-        const vId = row.getAttribute('data-id');
-        const rowYear = row.getAttribute('data-year');
-        if (activeYear !== 'all' && rowYear !== activeYear) return;
-        if (!matchedIds.has(vId)) return;
-        row.style.display = '';
-        visibleCount++;
-        if (isDesktop && filter.length >= 2) {
+    function applyFilters() {{
+        const filter = currentFilter.trim().toLowerCase();
+        const variants = filter ? getSearchVariants(filter) : [];
+        clearBtn.style.display = filter ? 'flex' : 'none';
+        let visibleCount = 0;
+        const matchedIds = filter ? new Set() : null;
+        if (filter) {{
+            searchIndex.forEach(item => {{ if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id); }});
+        }}
+        const rows = document.querySelectorAll('#mainGrid .row');
+        const isDesktop = window.innerWidth > 768;
+        rows.forEach(row => {{
+            const vId = row.getAttribute('data-id');
+            const rowYear = row.getAttribute('data-year');
+            if (activeYear !== 'all' && rowYear !== activeYear) {{ row.style.display = 'none'; return; }}
+            if (filter && !matchedIds.has(vId)) {{ row.style.display = 'none'; return; }}
+            row.style.display = '';
+            visibleCount++;
             const details = row.querySelector('details');
-            const tcList = row.querySelector('.tc-list');
-            if (details && tcList && tcList.children.length === 0) {
-                details.open = true;
-                renderTracklist(vId, tcList, filter);
-                animateContainer(tcList);
-                setTimeout(() => {
-                    const mark = tcList.querySelector('mark');
-                    if (mark) {
-                        const item = mark.closest('.tc-item');
-                        if (item) tcList.scrollTop = item.offsetTop - tcList.offsetTop - 10;
-                    }
-                }, 50);
-            }
-        }
-    });
-    statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
-}
+            if (details) {{
+                const tcList = details.querySelector('.tc-list');
+                if (tcList) {{
+                    if (filter) {{
+                        renderTracklist(vId, tcList, filter);
+                        if (isDesktop && filter.length >= 2) details.open = true;
+                        else details.open = false;
+                    }} else {{
+                        renderTracklist(vId, tcList, '');
+                        details.open = false;
+                    }}
+                }}
+            }}
+        }});
+        statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
+    }}
 
-const scrollBtn = document.getElementById('scrollTopBtn');
-window.addEventListener('scroll', () => { if (window.scrollY > 300) scrollBtn.classList.add('show'); else scrollBtn.classList.remove('show'); });
-scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    function initYearFilters() {{
+        const yearsSet = new Set();
+        document.querySelectorAll('#mainGrid .row').forEach(row => {{
+            const y = row.getAttribute('data-year');
+            if (y && y !== '0000') yearsSet.add(y);
+        }});
+        const sortedYears = Array.from(yearsSet).sort().reverse();
+        const container = document.getElementById('yearFilters');
+        let html = '<button class="year-btn active" data-year="all">Все годы</button>';
+        sortedYears.forEach(y => html += `<button class="year-btn" data-year="${{y}}">${{y}} года</button>`);
+        container.innerHTML = html;
+        container.addEventListener('click', (e) => {{
+            if (e.target.classList.contains('year-btn')) {{
+                document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeYear = e.target.getAttribute('data-year');
+                applyFilters();
+            }}
+        }});
+    }}
 
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadDatabase();
-    renderAllStreams();
+    const scrollBtn = document.getElementById('scrollTopBtn');
+    window.addEventListener('scroll', () => {{ if (window.scrollY > 300) scrollBtn.classList.add('show'); else scrollBtn.classList.remove('show'); }});
+    scrollBtn.addEventListener('click', () => window.scrollTo({{ top: 0, behavior: 'smooth' }}));
+
+    document.getElementById('mainGrid').addEventListener('click', (e) => {{
+        if (e.target.classList.contains('t-click')) {{
+            e.preventDefault();
+            const time = e.target.getAttribute('data-time');
+            const vId = e.target.closest('.row').getAttribute('data-id');
+            const parts = time.split(':').map(Number);
+            const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
+            window.open(`https://www.youtube.com/watch?v=${{vId}}&t=${{secs}}s`, '_blank');
+        }}
+    }});
+
+    let debounceTimer;
+    searchInput.addEventListener('input', () => {{
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {{
+            currentFilter = searchInput.value;
+            applyFilters();
+        }}, 700);
+    }});
+    clearBtn.addEventListener('click', () => {{
+        searchInput.value = '';
+        currentFilter = '';
+        clearBtn.style.display = 'none';
+        applyFilters();
+    }});
+
     initYearFilters();
-    executeSearch('');
-});
-
-document.getElementById('mainGrid').addEventListener('click', (e) => {
-    if (e.target.classList.contains('t-click')) {
-        e.preventDefault();
-        const time = e.target.getAttribute('data-time');
-        const vId = e.target.closest('.row').getAttribute('data-id');
-        const parts = time.split(':').map(Number);
-        const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
-        window.open(`https://www.youtube.com/watch?v=${vId}&t=${secs}s`, '_blank');
-    }
-});
-
-let debounceTimer;
-searchInput.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => executeSearch(searchInput.value.toLowerCase().trim()), 700); });
-clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch(''); });
+    applyFilters();
+}})();
 </script>
 </body>
 </html>"""
 
-    # Минификация HTML
-    html_content = textwrap.dedent(html_template)
-    html_content = "\n".join(line.rstrip() for line in html_content.splitlines() if line.strip())
-    html_content = re.sub(r'>\s+<', '><', html_content)
-    html_content = re.sub(r'\n+', '\n', html_content)
+    # Минификация (опционально)
+    final_html = "\n".join(line.rstrip() for line in final_html.splitlines() if line.strip())
+    final_html = re.sub(r'>\s+<', '><', final_html)
 
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        f.write(final_html)
     print(f"[HTML обновлён] {os.path.abspath(OUTPUT_HTML)}")
 
 
@@ -900,15 +937,17 @@ def run_parser():
 
             if not videos_to_parse:
                 print("Новых трансляций нет. База актуальна.")
-                generate_html_report()
-                return
+            else:
+                print(f"2. Парсинг {len(videos_to_parse)} видео (комментарии через API)...")
+                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                    executor.map(parse_single_video, videos_to_parse)
 
-            print(f"2. Парсинг {len(videos_to_parse)} видео (комментарии через API)...")
-            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                executor.map(parse_single_video, videos_to_parse)
-
-            print("\n3. Готово.")
-            generate_html_report()
+            print("\n3. Генерация статического сайта...")
+            db = load_database()
+            generate_html_report(db)
+            generate_sitemap(db)
+            generate_robots()
+            print("Готово.")
     except Exception as e:
         print(f"\nКРИТИЧЕСКАЯ ОШИБКА: {e}")
         sys.exit(1)
