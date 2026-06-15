@@ -13,9 +13,12 @@ API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 if not API_KEY:
     raise ValueError("Переменная окружения YOUTUBE_API_KEY не установлена")
 
+SITE_URL = "https://kvash9.github.io/arh"
+
 CHANNEL_STREAMS_URL = 'https://www.youtube.com/@kvashenaya/streams'
 DB_FILE = "parsed_streams_db.json"
 OUTPUT_HTML = "index.html"
+TRACKLISTS_HTML = "tracklists.html"
 
 NEW_STREAMS_TO_CHECK = 999
 MAX_WORKERS = 4
@@ -342,16 +345,85 @@ def parse_single_video(video_entry):
     return True
 
 
-def generate_html_report():
-    print("Генерация статического index.html...")
+def generate_sitemap():
+    """Генерация sitemap.xml с основными страницами сайта."""
+    pages = [
+        {"loc": f"{SITE_URL}/index.html", "priority": "1.0"},
+        {"loc": f"{SITE_URL}/tracklists.html", "priority": "0.8"},
+    ]
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for p in pages:
+        xml_lines.append("  <url>")
+        xml_lines.append(f"    <loc>{p['loc']}</loc>")
+        xml_lines.append(f"    <priority>{p['priority']}</priority>")
+        xml_lines.append("  </url>")
+    xml_lines.append("</urlset>")
 
+    with open("sitemap.xml", "w", encoding="utf-8") as f:
+        f.write("\n".join(xml_lines))
+    print(f"[Sitemap создан] {os.path.abspath('sitemap.xml')}")
+
+
+def generate_html_report():
+    print("Генерация статического index.html, SEO-страницы tracklists.html и sitemap.xml...")
+
+    # Загружаем базу для создания страницы треклистов
+    db_data = load_database()
+    streams_for_seo = [
+        item for item in db_data.values()
+        if item.get('list_type') in ('tracklist', 'mixed') and item.get('timecodes')
+    ]
+    streams_for_seo.sort(key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+
+    # Генерация tracklists.html (простой список для индексации)
+    seo_lines = [
+        '<!DOCTYPE html>',
+        '<html lang="ru">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+        '<title>Архив треклистов Квашеной – все треклисты</title>',
+        '<meta name="description" content="Полный список всех треков с трансляций Квашеной. Таймкоды и названия песен.">',
+        '<meta name="robots" content="index, follow">',
+        '</head>',
+        '<body>',
+        '<h1>Все треклисты трансляций Квашеной</h1>'
+    ]
+
+    for stream in streams_for_seo:
+        title = stream.get('title', 'Без названия')
+        date = stream.get('date', '')
+        seo_lines.append(f'<h2>{title} ({date})</h2>')
+        seo_lines.append('<ul>')
+        for line in stream.get('timecodes', []):
+            safe_line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            seo_lines.append(f'<li>{safe_line}</li>')
+        seo_lines.append('</ul>')
+    seo_lines.append('</body></html>')
+
+    with open(TRACKLISTS_HTML, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(seo_lines))
+    print(f"[SEO-страница создана] {os.path.abspath(TRACKLISTS_HTML)}")
+
+    # Шаблон index.html с экранированными процентами
     html_template = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Архив трансляций Квашеной</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+    <title>Архив трансляций Квашеной – треклисты песен</title>
+    <meta name="description" content="Полный архив музыкальных треклистов с трансляций Квашеной. Удобный поиск песен по таймкодам.">
+    <meta name="keywords" content="Квашеная, треклист, трансляции, музыка, песни, архив, таймкоды">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="%s/index.html">
+    <meta property="og:title" content="Архив треклистов Квашеной">
+    <meta property="og:description" content="Все песни с трансляций – поиск по трекам и таймкодам.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="%s/index.html">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%%22http://www.w3.org/2000/svg%%22 viewBox=%%220 0 100 100%%22><text y=%%22.9em%%22 font-size=%%2290%%22>🎵</text></svg>">
     <style>
         :root {
             --primary: #6366f1;
@@ -363,36 +435,36 @@ def generate_html_report():
             --border: rgba(255, 255, 255, 0.08);
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0 0 60px 0; color: var(--text-main); background: #0b1020; min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
-        .scroll-top { position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgb(23 29 61 / 28%); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; }
+        .scroll-top { position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgb(23 29 61 / 28%%); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; }
         .scroll-top:hover { background: rgba(99, 102, 241, 0.9); border-color: rgba(255, 255, 255, 0.5); transform: translateY(-3px); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
         .scroll-top.show { opacity: 1; visibility: visible; }
         @media (max-width: 768px) { .scroll-top { bottom: 20px; right: 20px; width: 44px; height: 44px; font-size: 20px; } }
         .skeleton-row { background: linear-gradient(180deg, rgba(30, 38, 58, 0.8), rgba(22, 28, 45, 0.9)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: row; gap: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }
         .skeleton-img { width: 160px; height: 90px; background: #1e293b; border-radius: 12px; }
         .skeleton-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
-        .skeleton-title { width: 70%; height: 24px; background: #1e293b; border-radius: 8px; }
-        .skeleton-details { width: 40%; height: 20px; background: #1e293b; border-radius: 8px; }
+        .skeleton-title { width: 70%%; height: 24px; background: #1e293b; border-radius: 8px; }
+        .skeleton-details { width: 40%%; height: 20px; background: #1e293b; border-radius: 8px; }
         .shimmer { position: relative; overflow: hidden; }
-        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%); animation: shimmerMove 1.2s infinite linear; pointer-events: none; }
-        @keyframes shimmerMove { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-        @media (max-width: 768px) { .skeleton-row { flex-direction: column; gap: 16px; } .skeleton-img { width: 100%; aspect-ratio: 16/9; height: auto; } .skeleton-title { width: 85%; } }
-        .parallax-notes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
+        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; width: 100%%; height: 100%%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%%, rgba(255,255,255,0.06) 40%%, rgba(255,255,255,0) 60%%); animation: shimmerMove 1.2s infinite linear; pointer-events: none; }
+        @keyframes shimmerMove { 0%% { transform: translateX(-100%%); } 100%% { transform: translateX(100%%); } }
+        @media (max-width: 768px) { .skeleton-row { flex-direction: column; gap: 16px; } .skeleton-img { width: 100%%; aspect-ratio: 16/9; height: auto; } .skeleton-title { width: 85%%; } }
+        .parallax-notes { position: fixed; top: 0; left: 0; width: 100%%; height: 100%%; overflow: hidden; pointer-events: none; z-index: 0; }
         .note { position: absolute; user-select: none; pointer-events: none; will-change: top; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; text-shadow: 0 0 12px rgba(0,0,0,0.4); transition: top 0.1s linear; }
         .note-content { display: inline-block; animation: gentleFloat 6s infinite ease-in-out; will-change: transform; }
-        @keyframes gentleFloat { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
-        body::before { content: ""; position: fixed; inset: 0; z-index: -10; pointer-events: none; background-image: radial-gradient(at 80% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 20% 80%, rgba(244, 63, 94, 0.1) 0px, transparent 50%); background-repeat: no-repeat; }
+        @keyframes gentleFloat { 0%% { transform: translateY(0px); } 50%% { transform: translateY(-12px); } 100%% { transform: translateY(0px); } }
+        body::before { content: ""; position: fixed; inset: 0; z-index: -10; pointer-events: none; background-image: radial-gradient(at 80%% 20%%, rgba(99, 102, 241, 0.15) 0px, transparent 50%%), radial-gradient(at 20%% 80%%, rgba(244, 63, 94, 0.1) 0px, transparent 50%%); background-repeat: no-repeat; }
         .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
         .header-panel { position: sticky; top: 0; background: rgba(11, 15, 25, 0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px 0; margin-bottom: 40px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
         .header-flex { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
         .header-flex h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; white-space: nowrap; }
-        .header-flex h2 span { white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-flex h2 span { white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%%, #6366f1 100%%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }
         .search-box { flex-grow: 1; max-width: 400px; display: flex; flex-direction: column; align-items: flex-start; }
-        .input-wrapper { position: relative; width: 100%; display: flex; align-items: center; }
-        .s-input { width: 100%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-sizing: border-box; outline: none; transition: all 0.3s; background: rgba(15, 23, 42, 0.6); color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .input-wrapper { position: relative; width: 100%%; display: flex; align-items: center; }
+        .s-input { width: 100%%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-sizing: border-box; outline: none; transition: all 0.3s; background: rgba(15, 23, 42, 0.6); color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
         .s-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(15, 23, 42, 0.8); }
         #searchStats { color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; margin: 10px 0 4px 4px; pointer-events: none; }
-        .s-clear-btn { position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }
+        .s-clear-btn { position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }
         .s-clear-btn:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
         .year-filters { display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
         .year-btn { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 14px; flex-shrink: 0; }
@@ -401,7 +473,7 @@ def generate_html_report():
         .grid { display: flex; flex-direction: column; gap: 24px; }
         .grid:empty { min-height: 60vh; }
         .row { position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; align-items: flex-start; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; overflow: hidden; z-index: 1; }
-        .row::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }
+        .row::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }
         .row * { position: relative; z-index: 2; }
         .row:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 12px 30px rgba(0,0,0,0.3); }
         .row:hover::before { opacity: 0.6; }
@@ -411,13 +483,13 @@ def generate_html_report():
         .v-title-link { text-decoration: none; align-self: flex-start; }
         .v-title-link:hover .v-title { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
         .img-container { position: relative; width: 160px; height: 90px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: #151c2d; border: 1px solid rgba(255,255,255,0.05); transform: translateZ(0); }
-        .img-container::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e293b; z-index: 0; }
-        .img-container img { width: 101%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s, opacity 0.2s; position: relative; z-index: 1; }
+        .img-container::before { content: ""; position: absolute; top: 0; left: 0; width: 100%%; height: 100%%; background: #1e293b; z-index: 0; }
+        .img-container img { width: 101%%; height: 100%%; object-fit: cover; display: block; transition: transform 0.3s, opacity 0.2s; position: relative; z-index: 1; }
         .img-container:hover img { transform: scale(1.05); }
-        .play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.75); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-weight: bold; z-index: 2; }
+        .play-overlay { position: absolute; top: 0; left: 0; width: 100%%; height: 100%%; background: rgba(15, 23, 42, 0.75); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-weight: bold; z-index: 2; }
         .img-container:hover .play-overlay { opacity: 1; }
         .v-title { font-size: 18px; color: #f8fafc; font-weight: 700; line-height: 1.4; transition: color 0.2s; overflow-wrap: break-word; }
-        .v-tcs { width: 100%; max-width: 600px; }
+        .v-tcs { width: 100%%; max-width: 600px; }
         details { background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); transition: all 0.2s; }
         details[open] { background: rgba(15, 23, 42, 0.7); border-color: rgba(99, 102, 241, 0.4); }
         summary { font-weight: 600; cursor: pointer; color: #cbd5e1; outline: none; user-select: none; font-size: 14px; list-style: none; }
@@ -445,10 +517,13 @@ def generate_html_report():
         .gray { color: var(--text-muted); font-size: 14px; font-style: italic; }
         .no-tcs-box { padding: 4px 0; }
         .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
-        @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
+        @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%%; max-width: 100%%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%%; } .v-link { display: block; width: 100%%; z-index: 2; } .img-container { width: 100%%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%%; width: 100%%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
     </style>
 </head>
 <body>
+<!-- Скрытая ссылка для поисковиков на полный список треклистов -->
+<a href="tracklists.html" style="display:none;" aria-hidden="true">Полный список треков (SEO)</a>
+
 <div class="parallax-notes" id="parallaxNotes"></div>
 <div class="header-panel">
     <div class="container header-flex">
@@ -498,8 +573,8 @@ def generate_html_report():
         contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
         contentSpan.style.animationDelay = `${Math.random() * 3}s`;
         noteDiv.appendChild(contentSpan);
-        noteDiv.style.left = left + '%';
-        noteDiv.style.top = top + '%';
+        noteDiv.style.left = left + '%%';
+        noteDiv.style.top = top + '%%';
         noteDiv.style.transform = `rotate(${rotation}deg)`;
         notesContainer.appendChild(noteDiv);
         notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
@@ -513,7 +588,7 @@ def generate_html_report():
             const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
             let newTop = n.baseTop + shiftPercent;
             newTop = Math.min(Math.max(newTop, -5), 105);
-            n.element.style.top = newTop + '%';
+            n.element.style.top = newTop + '%%';
         }
         ticking = false;
     }
@@ -645,7 +720,6 @@ async function loadDatabase() {
         if (!response.ok) throw new Error('Файл базы не найден');
         let rawData = await response.json();
         rawData.sort((a,b) => (b.raw_date || '00000000').localeCompare(a.raw_date || '00000000'));
-        // Берем треклисты и сборные списки
         streamsData = rawData.filter(entry => entry.list_type === 'tracklist' || entry.list_type === 'mixed');
         songsDB = {};
         searchIndex = [];
@@ -857,9 +931,9 @@ searchInput.addEventListener('input', () => { clearTimeout(debounceTimer); debou
 clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch(''); });
 </script>
 </body>
-</html>"""
+</html>""" % (SITE_URL, SITE_URL)
 
-    # Минификация HTML
+    # Минификация HTML и запись
     html_content = textwrap.dedent(html_template)
     html_content = "\n".join(line.rstrip() for line in html_content.splitlines() if line.strip())
     html_content = re.sub(r'>\s+<', '><', html_content)
@@ -868,6 +942,9 @@ clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.styl
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(html_content)
     print(f"[HTML обновлён] {os.path.abspath(OUTPUT_HTML)}")
+
+    # Генерация карты сайта
+    generate_sitemap()
 
 
 def run_parser():
@@ -894,7 +971,6 @@ def run_parser():
                 video_id = entry.get('id')
                 if not video_id:
                     continue
-                # Пропускаем только те, которые уже имеют треклист или смешанный список
                 if video_id in db_data and db_data[video_id].get('list_type') in ('tracklist', 'mixed'):
                     continue
                 videos_to_parse.append({
