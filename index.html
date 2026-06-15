@@ -30,20 +30,8 @@
         .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
         .header-panel { position: sticky; top: 0; background: rgba(11, 15, 25, 0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px 0; margin-bottom: 40px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
         .header-flex { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-        /* Исправление для заголовка — единая строка без переносов */
-        .header-flex h2 {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: baseline;
-            gap: 0.25rem;
-            white-space: nowrap;
-        }
-        .header-flex h2 span {
-            white-space: nowrap;
-            background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .header-flex h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; white-space: nowrap; }
+        .header-flex h2 span { white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }
         .search-box { flex-grow: 1; max-width: 400px; display: flex; flex-direction: column; align-items: flex-start; }
         .input-wrapper { position: relative; width: 100%; display: flex; align-items: center; }
@@ -175,7 +163,7 @@ function removeSpecificEmojis(str) {
 // ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
 function normalize(str) {
     return str.toLowerCase()
-              .replace(/ë/g, 'e')   // замена умлаута
+              .replace(/ë/g, 'e')
               .replace(/[^a-zа-яё0-9]/g, '');
 }
 const SYNONYMS = {
