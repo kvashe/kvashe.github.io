@@ -5,7 +5,6 @@ import threading
 import textwrap
 import requests
 import sys
-from datetime import datetime
 from yt_dlp import YoutubeDL
 from concurrent.futures import ThreadPoolExecutor
 
@@ -343,139 +342,187 @@ def parse_single_video(video_entry):
     return True
 
 
-def generate_sitemap(streams):
-    sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    sitemap += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-    sitemap += f'''
-    <url>
-        <loc>https://kvash9.github.io/arh/</loc>
-        <lastmod>{datetime.now().date().isoformat()}</lastmod>
-        <priority>1.00</priority>
-    </url>\n'''
-    for stream in streams:
-        video_url = f"https://www.youtube.com/watch?v={stream['id']}"
-        lastmod = stream.get('raw_date', datetime.now().date().isoformat())
-        if len(lastmod) == 8:
-            lastmod = f"{lastmod[:4]}-{lastmod[4:6]}-{lastmod[6:8]}"
-        sitemap += f'''
-    <url>
-        <loc>{video_url}</loc>
-        <lastmod>{lastmod}</lastmod>
-        <priority>0.80</priority>
-    </url>\n'''
-    sitemap += '</urlset>'
-    with open("sitemap.xml", "w", encoding="utf-8") as f:
-        f.write(sitemap)
-    print("sitemap.xml сгенерирован")
-
-
-def generate_robots_txt():
-    robots = """User-agent: *
-Allow: /
-Sitemap: https://kvash9.github.io/arh/sitemap.xml
-"""
-    with open("robots.txt", "w", encoding="utf-8") as f:
-        f.write(robots)
-    print("robots.txt сгенерирован")
-
-
 def generate_html_report():
     print("Генерация статического index.html...")
-    db_data = load_database()
-    sorted_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
 
-    preloaded_json = json.dumps(sorted_streams, ensure_ascii=False)
-
-    # HTML-шаблон с исправленными регулярками
     html_template = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Архив трансляций Квашеной — треклисты и таймкоды</title>
-    <meta name="description" content="Архив YouTube-стримов Квашеной с готовыми треклистами и таймкодами. Поиск песен по удобному каталогу.">
-    <meta name="keywords" content="Квашеная, стримы, треклисты, песни, YouTube, архив">
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://kvash9.github.io/arh/">
+    <title>Архив трансляций Квашеной</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
     <style>
-        /* Стили (сокращены для краткости, но в реальном коде они полные) */
-        :root { --primary: #6366f1; --primary-hover: #4f46e5; --bg: #0b0f19; --card-bg: rgba(22,28,45,0.6); --text-main: #f1f5f9; --text-muted: #94a3b8; --border: rgba(255,255,255,0.08); }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0 0 60px; color: var(--text-main); background: #0b1020; min-height: 100vh; overflow-x: hidden; }
-        .scroll-top { position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgba(23,29,61,0.28); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 1000; }
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.6);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0 0 60px 0; color: var(--text-main); background: #0b1020; min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        .scroll-top { position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgb(23 29 61 / 28%); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; }
+        .scroll-top:hover { background: rgba(99, 102, 241, 0.9); border-color: rgba(255, 255, 255, 0.5); transform: translateY(-3px); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
         .scroll-top.show { opacity: 1; visibility: visible; }
-        .skeleton-row { background: linear-gradient(180deg, rgba(30,38,58,0.8), rgba(22,28,45,0.9)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: row; gap: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }
+        @media (max-width: 768px) { .scroll-top { bottom: 20px; right: 20px; width: 44px; height: 44px; font-size: 20px; } }
+        .skeleton-row { background: linear-gradient(180deg, rgba(30, 38, 58, 0.8), rgba(22, 28, 45, 0.9)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: row; gap: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }
         .skeleton-img { width: 160px; height: 90px; background: #1e293b; border-radius: 12px; }
         .skeleton-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
         .skeleton-title { width: 70%; height: 24px; background: #1e293b; border-radius: 8px; }
+        .skeleton-details { width: 40%; height: 20px; background: #1e293b; border-radius: 8px; }
         .shimmer { position: relative; overflow: hidden; }
-        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%); animation: shimmerMove 1.2s infinite linear; }
+        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%); animation: shimmerMove 1.2s infinite linear; pointer-events: none; }
         @keyframes shimmerMove { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @media (max-width: 768px) { .skeleton-row { flex-direction: column; gap: 16px; } .skeleton-img { width: 100%; aspect-ratio: 16/9; height: auto; } .skeleton-title { width: 85%; } }
         .parallax-notes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
-        .note { position: absolute; user-select: none; pointer-events: none; }
-        .note-content { display: inline-block; animation: gentleFloat 6s infinite ease-in-out; }
+        .note { position: absolute; user-select: none; pointer-events: none; will-change: top; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; text-shadow: 0 0 12px rgba(0,0,0,0.4); transition: top 0.1s linear; }
+        .note-content { display: inline-block; animation: gentleFloat 6s infinite ease-in-out; will-change: transform; }
         @keyframes gentleFloat { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
+        body::before { content: ""; position: fixed; inset: 0; z-index: -10; pointer-events: none; background-image: radial-gradient(at 80% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 20% 80%, rgba(244, 63, 94, 0.1) 0px, transparent 50%); background-repeat: no-repeat; }
         .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
-        .header-panel { position: sticky; top: 0; background: rgba(11,15,25,0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px; margin-bottom: 40px; }
+        .header-panel { position: sticky; top: 0; background: rgba(11, 15, 25, 0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px 0; margin-bottom: 40px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
         .header-flex { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-        h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; }
-        .search-box { flex-grow: 1; max-width: 400px; }
-        .s-input { width: 100%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; background: rgba(15,23,42,0.6); color: #fff; }
-        .s-input:focus { border-color: var(--primary); outline: none; }
-        #searchStats { color: var(--text-muted); font-size: 13px; margin-top: 8px; }
-        .year-filters { display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; }
-        .year-btn { background: rgba(30,41,59,0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; color: var(--text-muted); cursor: pointer; }
-        .year-btn.active { background: var(--primary); color: #fff; }
+        .header-flex h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; white-space: nowrap; }
+        .header-flex h2 span { white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }
+        .search-box { flex-grow: 1; max-width: 400px; display: flex; flex-direction: column; align-items: flex-start; }
+        .input-wrapper { position: relative; width: 100%; display: flex; align-items: center; }
+        .s-input { width: 100%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-sizing: border-box; outline: none; transition: all 0.3s; background: rgba(15, 23, 42, 0.6); color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .s-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(15, 23, 42, 0.8); }
+        #searchStats { color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; margin: 10px 0 4px 4px; pointer-events: none; }
+        .s-clear-btn { position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }
+        .s-clear-btn:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        .year-filters { display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+        .year-btn { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 14px; flex-shrink: 0; }
+        .year-btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
+        .year-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
         .grid { display: flex; flex-direction: column; gap: 24px; }
-        .row { position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; }
-        .v-date { position: absolute; top: 24px; right: 24px; background: rgba(15,23,42,0.6); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
-        .img-container { width: 160px; height: 90px; border-radius: 12px; overflow: hidden; background: #151c2d; }
-        .img-container img { width: 100%; height: 100%; object-fit: cover; }
-        .v-title { font-size: 18px; color: #f8fafc; font-weight: 700; }
-        details { background: rgba(15,23,42,0.4); padding: 12px 18px; border-radius: 12px; margin-top: 16px; }
-        summary { font-weight: 600; cursor: pointer; }
-        .summary-flex { display: flex; justify-content: space-between; }
-        .tc-list { margin-top: 16px; max-height: 280px; overflow-y: auto; }
-        .tc-item { margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
-        .t-click { background: rgba(99,102,241,0.15); color: #a5b4fc; padding: 3px 10px; border-radius: 6px; cursor: pointer; }
-        .badge-tracklist { background: rgba(16,185,129,0.1); color: #34d399; padding: 5px 12px; border-radius: 8px; font-size: 12px; }
-        .badge-mixed { background: rgba(245,158,11,0.1); color: #fbbf24; padding: 5px 12px; border-radius: 8px; font-size: 12px; }
-        mark { background: rgba(139,92,246,0.35); color: white; padding: 1px; border-radius: 6px; }
-        @media (max-width: 768px) { .row { flex-direction: column; } .v-date { position: static; margin-bottom: 8px; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; } .v-content-block { padding-right: 0; } }
+        .grid:empty { min-height: 60vh; }
+        .row { position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; align-items: flex-start; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; overflow: hidden; z-index: 1; }
+        .row::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }
+        .row * { position: relative; z-index: 2; }
+        .row:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 12px 30px rgba(0,0,0,0.3); }
+        .row:hover::before { opacity: 0.6; }
+        .v-date { position: absolute; top: 24px; right: 24px; color: var(--text-muted); font-size: 13px; font-weight: 700; background: rgba(15, 23, 42, 0.6); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); letter-spacing: 0.5px; z-index: 3; }
+        .v-content-block { display: flex; flex-direction: column; gap: 16px; flex-grow: 1; padding-right: 110px; }
+        .v-link { text-decoration: none; flex-shrink: 0; }
+        .v-title-link { text-decoration: none; align-self: flex-start; }
+        .v-title-link:hover .v-title { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .img-container { position: relative; width: 160px; height: 90px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: #151c2d; border: 1px solid rgba(255,255,255,0.05); transform: translateZ(0); }
+        .img-container::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e293b; z-index: 0; }
+        .img-container img { width: 101%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s, opacity 0.2s; position: relative; z-index: 1; }
+        .img-container:hover img { transform: scale(1.05); }
+        .play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.75); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-weight: bold; z-index: 2; }
+        .img-container:hover .play-overlay { opacity: 1; }
+        .v-title { font-size: 18px; color: #f8fafc; font-weight: 700; line-height: 1.4; transition: color 0.2s; overflow-wrap: break-word; }
+        .v-tcs { width: 100%; max-width: 600px; }
+        details { background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); transition: all 0.2s; }
+        details[open] { background: rgba(15, 23, 42, 0.7); border-color: rgba(99, 102, 241, 0.4); }
+        summary { font-weight: 600; cursor: pointer; color: #cbd5e1; outline: none; user-select: none; font-size: 14px; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        .summary-flex { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+        .summary-flex span:first-child::before { content: "▼ "; font-size: 9px; color: var(--text-muted); display: inline-block; transition: transform 0.2s; margin-right: 8px; transform: rotate(-90deg); }
+        details[open] summary .summary-flex span:first-child::before { transform: rotate(0deg); }
+        .tc-list { margin-top: 16px; line-height: 1.7; max-height: 280px; overflow-y: auto; padding-right: 8px; position: relative; transition: opacity 0.3s ease, transform 0.3s ease; }
+        .tc-list::-webkit-scrollbar { width: 4px; }
+        .tc-list::-webkit-scrollbar-track { background: transparent; }
+        .tc-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+        .tc-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+        .no-tc-block { background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); cursor: default; }
+        .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; }
+        .t-click { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 3px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-right: 12px; display: inline-block; font-size: 13px; transition: all 0.2s; font-variant-numeric: tabular-nums; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .t-click:hover { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 10px rgba(99,102,241,0.4); }
+        .tc-item { margin-bottom: 10px; border-bottom: 1px dashed rgba(255, 255, 255, 0.15); padding-bottom: 8px; font-size: 14px; display: flex; align-items: center; }
+        .tc-item:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .s-title { color: #e2e8f0; }
+        .badge { display: inline-block; padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; }
+        .badge-tracklist { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-mixed { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        mark { background: rgba(139, 92, 246, 0.35); color: #ffffff; padding: 1px 1px; border-radius: 6px; border: 1px solid rgba(196, 181, 253, 0.6); text-shadow: 0 0 6px rgba(139, 92, 246, 0.8); }
+        .hide { display: none; }
+        .gray { color: var(--text-muted); font-size: 14px; font-style: italic; }
+        .no-tcs-box { padding: 4px 0; }
+        .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
+        @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
     </style>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "CollectionPage",
-      "name": "Архив трансляций Квашеной",
-      "description": "Архив YouTube-стримов Квашеной с готовыми треклистами и таймкодами.",
-      "url": "https://kvash9.github.io/arh/",
-      "numberOfItems": {len(sorted_streams)}
-    }
-    </script>
 </head>
 <body>
 <div class="parallax-notes" id="parallaxNotes"></div>
 <div class="header-panel">
     <div class="container header-flex">
-        <h2>Архив трансляций <span style="background:linear-gradient(135deg,#a5b4fc,#6366f1); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Квашеной</span></h2>
+        <h2>Архив трансляций <span>Квашеной</span></h2>
         <div class="search-box">
-            <input type="text" id="sInput" class="s-input" placeholder="Поиск песни">
-            <div id="searchStats">Найдено трансляций: {len(sorted_streams)}</div>
+            <form class="input-wrapper" onsubmit="event.preventDefault();">
+                <input type="text" id="sInput" class="s-input" placeholder="Поиск песни">
+                <button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button>
+            </form>
+            <div id="searchStats">Найдено трансляций: 0</div>
         </div>
     </div>
 </div>
 <div class="container">
     <div id="yearFilters" class="year-filters"></div>
     <div class="grid" id="mainGrid">
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div></div></div>
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div></div></div>
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
     </div>
 </div>
-<button class="scroll-top" id="scrollTopBtn">↑</button>
+<button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
 <script>
-window.__PRELOADED_DATA__ = {preloaded_json};
+(function() {
+    const notesContainer = document.getElementById('parallaxNotes');
+    if (!notesContainer) return;
+    const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
+    const notesCount = 10;
+    const notes = [];
+    for (let i = 0; i < notesCount; i++) {
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'note';
+        const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
+        const size = Math.floor(Math.random() * 130) + 50;
+        const left = Math.random() * 100;
+        const top = Math.random() * 100;
+        const opacity = Math.random() * 0.4 + 0.2;
+        const rotation = Math.random() * 360;
+        const parallaxFactor = 0.2 + Math.random() * 0.6;
+        const contentSpan = document.createElement('span');
+        contentSpan.className = 'note-content';
+        contentSpan.textContent = symbol;
+        contentSpan.style.fontSize = size + 'px';
+        contentSpan.style.opacity = opacity;
+        contentSpan.style.color = `rgba(255, 255, 255, ${opacity * 0.9})`;
+        const animDuration = 4 + Math.random() * 6;
+        contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
+        contentSpan.style.animationDelay = `${Math.random() * 3}s`;
+        noteDiv.appendChild(contentSpan);
+        noteDiv.style.left = left + '%';
+        noteDiv.style.top = top + '%';
+        noteDiv.style.transform = `rotate(${rotation}deg)`;
+        notesContainer.appendChild(noteDiv);
+        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
+    }
+    let ticking = false;
+    function updateNotesPosition() {
+        const scrollY = window.scrollY;
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
+        for (let n of notes) {
+            const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
+            let newTop = n.baseTop + shiftPercent;
+            newTop = Math.min(Math.max(newTop, -5), 105);
+            n.element.style.top = newTop + '%';
+        }
+        ticking = false;
+    }
+    window.addEventListener('scroll', () => { if (!ticking) { requestAnimationFrame(updateNotesPosition); ticking = true; } });
+    window.addEventListener('resize', () => updateNotesPosition());
+    updateNotesPosition();
+})();
 
+// ========== БЕЗОПАСНОЕ УДАЛЕНИЕ ТОЛЬКО ЭМОДЗИ ==========
 function removeSpecificEmojis(str) {
     if (typeof Intl !== 'undefined' && Intl.Segmenter) {
         const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
@@ -494,120 +541,150 @@ function removeSpecificEmojis(str) {
     }
 }
 
+// ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
 function normalize(str) {
-    return str.toLowerCase().replace(/ë/g, 'e').replace(/[^a-zа-яё0-9]/g, '');
+    return str.toLowerCase()
+              .replace(/ë/g, 'e')
+              .replace(/[^a-zа-яё0-9]/g, '');
 }
 
 const SYNONYMS = {
-    "noizemc": ["noizemc","noizemc","нойзмс","нойзмс","noize","нойз"],
-    "rammstein": ["rammstein","раммштайн"],
-    "корольишут": ["корольишут","киш"],
-    "витас": ["витас","vitas"],
-    "ladygaga": ["ladygaga","ледигага"],
-    "максим": ["максим","макsим"],
-    "fleur": ["fleur","flëur"],
-    "nautiluspompilius": ["nautiluspompilius","наутилуспомпилиус","pompilius","nautilus","наутилус","помпилиус"],
-    "океанэлзи": ["океанэлзи","элзи","океанэльзы","эльзы","океанельзи","ельзи"]
+    "noizemc": ["noizemc", "noizemc", "нойзмс", "нойзмс", "noize", "нойз"],
+    "rammstein": ["rammstein", "раммштайн"],
+    "корольишут": ["корольишут", "киш"],
+    "витас": ["витас", "vitas"],
+    "ladygaga": ["ladygaga", "ледигага"],
+    "максим": ["максим", "макsим"],
+    "fleur": ["fleur", "flëur"],
+    "nautiluspompilius": ["nautiluspompilius", "наутилуспомпилиус", "pompilius", "nautilus", "наутилус", "помпилиус"],
+    "океанэлзи": ["океанэлзи", "элзи", "океанэльзы", "эльзы", "океанельзи", "ельзи"]
 };
+
 const variantToCanon = new Map();
 for (const [canon, variants] of Object.entries(SYNONYMS)) {
-    for (const v of variants) variantToCanon.set(v, canon);
+    for (const v of variants) {
+        variantToCanon.set(v, canon);
+    }
 }
+
 function getSearchVariants(query) {
     const normQuery = normalize(query);
-    if (variantToCanon.has(normQuery)) return SYNONYMS[variantToCanon.get(normQuery)];
+    if (variantToCanon.has(normQuery)) {
+        const canon = variantToCanon.get(normQuery);
+        return SYNONYMS[canon];
+    }
     return [normQuery];
 }
+
 function matchesWithVariants(textNorm, variants) {
-    for (let v of variants) if (textNorm.includes(normalize(v))) return true;
+    for (let v of variants) {
+        const normVariant = normalize(v);
+        if (textNorm.includes(normVariant)) return true;
+    }
     return false;
 }
+
 function highlightFirstMatch(original, variants) {
-    if (!variants || variants.length===0) return original;
+    if (!variants || variants.length === 0) return original;
     const normOriginal = normalize(original);
-    let bestMatch = null, bestIndex = Infinity;
+    let bestMatch = null;
+    let bestIndex = Infinity;
     for (let v of variants) {
-        const idx = normOriginal.indexOf(normalize(v));
-        if (idx !== -1 && idx < bestIndex) { bestIndex = idx; bestMatch = v; }
+        const idx = normOriginal.indexOf(v);
+        if (idx !== -1 && idx < bestIndex) {
+            bestIndex = idx;
+            bestMatch = v;
+        }
     }
-    if (bestMatch===null) return original;
-    let origIdx=0, normIdx=0;
+    if (bestMatch === null) return original;
+    let origIdx = 0, normIdx = 0;
     while (normIdx < bestIndex && origIdx < original.length) {
         const ch = original[origIdx];
-        if (normalize(ch).length) normIdx++;
+        const nch = normalize(ch);
+        if (nch.length > 0) normIdx++;
         origIdx++;
     }
     const startOrig = origIdx;
     while (normIdx < bestIndex + bestMatch.length && origIdx < original.length) {
         const ch = original[origIdx];
-        if (normalize(ch).length) normIdx++;
+        const nch = normalize(ch);
+        if (nch.length > 0) normIdx++;
         origIdx++;
     }
     const endOrig = origIdx;
-    return original.substring(0,startOrig) + '<mark>' + original.substring(startOrig,endOrig) + '</mark>' + original.substring(endOrig);
+    return original.substring(0, startOrig) + '<mark>' + original.substring(startOrig, endOrig) + '</mark>' + original.substring(endOrig);
 }
 
-let streamsData = [], songsDB = {}, searchIndex = [], activeYear = 'all', allRows = [];
+let streamsData = [];
+let songsDB = {};
+let searchIndex = [];
+let activeYear = 'all';
+let allRows = [];
 
 function getTimecodeSeconds(line) {
-    const m = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-    if (!m) return 99999999;
-    const parts = m[1].split(':').map(Number);
-    if (parts.length===2) return parts[0]*60+parts[1];
-    if (parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+    const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+    if (!match) return 99999999;
+    const parts = match[1].split(':').map(Number);
+    if (parts.length === 2) return parts[0]*60 + parts[1];
+    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
     return 99999999;
 }
+
 function normalizeTimecode(tc) {
     const parts = tc.split(':').map(Number);
-    if (parts.length===2) return `00:${parts[0].toString().padStart(2,'0')}:${parts[1].toString().padStart(2,'0')}`;
-    if (parts.length===3) return parts.map(p=>p.toString().padStart(2,'0')).join(':');
+    if (parts.length === 2) return `00:${parts[0].toString().padStart(2,'0')}:${parts[1].toString().padStart(2,'0')}`;
+    if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
     return tc;
 }
 
 async function loadDatabase() {
-    if (streamsData.length) return;
-    if (window.__PRELOADED_DATA__ && window.__PRELOADED_DATA__.length) {
-        streamsData = window.__PRELOADED_DATA__;
-    } else {
-        try {
-            const resp = await fetch('parsed_streams_db.json');
-            if (!resp.ok) throw new Error();
-            streamsData = await resp.json();
-        } catch(e) { console.error(e); streamsData = []; return; }
-    }
-    songsDB = {}; searchIndex = [];
-    streamsData.forEach(entry => {
-        const vId = entry.id;
-        const timecodes = entry.timecodes || [];
-        const sorted = timecodes.slice().sort((a,b)=>getTimecodeSeconds(a)-getTimecodeSeconds(b));
-        const tracks = sorted.map(line => {
-            const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-            if (match) {
-                let s = line.replace(match[1],'').trim().replace(/^[-–—]\s*/,'');
-                s = removeSpecificEmojis(s);
-                return { t: match[1], s: s };
-            } else {
-                return { s: removeSpecificEmojis(line) };
-            }
+    if (streamsData.length > 0) return;
+    try {
+        const response = await fetch('parsed_streams_db.json');
+        if (!response.ok) throw new Error('Файл базы не найден');
+        const rawData = await response.json();
+        rawData.sort((a,b) => (b.raw_date || '00000000').localeCompare(a.raw_date || '00000000'));
+        streamsData = rawData;
+        songsDB = {};
+        searchIndex = [];
+        rawData.forEach(entry => {
+            const vId = entry.id;
+            const timecodes = entry.timecodes || [];
+            const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
+            const tracks = sorted.map(line => {
+                const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+                if (match) {
+                    let s = line.replace(match[1], '').trim();
+                    s = s.replace(/^[-–—]\s*/, '');
+                    s = removeSpecificEmojis(s);
+                    return { t: match[1], s: s };
+                } else {
+                    let s = line;
+                    s = removeSpecificEmojis(s);
+                    return { s: s };
+                }
+            });
+            songsDB[vId] = { tracks, author: entry.author || '' };
+            tracks.forEach(tr => {
+                const norm = normalize(tr.s || '');
+                searchIndex.push({ id: vId, text: tr.s, norm: norm });
+            });
         });
-        songsDB[vId] = { tracks, author: entry.author || '' };
-        tracks.forEach(tr => {
-            const norm = normalize(tr.s || '');
-            searchIndex.push({ id: vId, text: tr.s, norm });
-        });
-    });
+    } catch(e) { console.error('Ошибка загрузки базы:', e); streamsData = []; }
 }
 
 function renderStreamHTML(stream) {
-    const vId = stream.id, title = stream.title || 'Без названия', date = stream.date || 'Неизвестно';
+    const vId = stream.id;
+    const title = stream.title || 'Без названия';
+    const date = stream.date || 'Неизвестно';
     const rawYear = (stream.raw_date || '0000').substring(0,4);
     const timecodes = stream.timecodes || [];
     const listType = stream.list_type || 'none';
-    const hasTracks = timecodes.length>0;
-    const badgeClass = (listType==='tracklist'||listType==='mixed') ? `badge-${listType}` : 'hide';
-    const badgeText = listType==='tracklist' ? 'Готовый трек-лист' : (listType==='mixed' ? 'Сборный список' : '');
-    const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${timecodes.length}</span><span class="${badgeClass}">${badgeText}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
-    return `<div class="row" data-id="${vId}" data-year="${rawYear}" style="--bg-thumb: url('https://img.youtube.com/vi/${vId}/hqdefault.jpg');"><span class="v-date">${date}</span><a class="v-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${vId}/hqdefault.jpg" alt=""></div></a><div class="v-content-block"><a href="https://www.youtube.com/watch?v=${vId}" target="_blank" style="text-decoration:none"><span class="v-title">${title}</span></a><div class="v-tcs">${tcsHTML}</div></div></div>`;
+    const hasTracks = timecodes.length > 0;
+    const badgeClass = (listType === 'tracklist' || listType === 'mixed') ? `badge-${listType}` : 'hide';
+    const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
+    const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${timecodes.length}</span><span class="badge ${badgeClass}">${badgeText}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
+    return `<div class="row" data-id="${vId}" data-year="${rawYear}" style="--bg-thumb: url('https://img.youtube.com/vi/${vId}/hqdefault.jpg');"><span class="v-date">${date}</span><a class="v-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${vId}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><span class="v-title">${title}</span></a><div class="v-tcs">${tcsHTML}</div></div></div>`;
 }
 
 function animateContainer(container) {
@@ -623,7 +700,7 @@ function animateContainer(container) {
 function renderAllStreams() {
     const grid = document.getElementById('mainGrid');
     grid.innerHTML = streamsData.map(renderStreamHTML).join('');
-    allRows = [...document.querySelectorAll('.row')];
+    allRows = [...grid.querySelectorAll('.row')];
     document.querySelectorAll('details').forEach(details => {
         details.addEventListener('toggle', function() {
             const container = this.querySelector('.tc-list');
@@ -631,10 +708,18 @@ function renderAllStreams() {
             if (this.open) {
                 const row = this.closest('.row');
                 const vId = row.getAttribute('data-id');
-                const filter = document.getElementById('sInput').value.toLowerCase().trim();
+                const filter = searchInput.value.toLowerCase().trim();
                 if (container.children.length === 0) renderTracklist(vId, container, filter);
                 animateContainer(container);
-                if (filter) setTimeout(() => { const mark = container.querySelector('mark'); if(mark) mark.closest('.tc-item')?.scrollIntoView({block:'nearest'}); }, 50);
+                if (filter) {
+                    setTimeout(() => {
+                        const mark = container.querySelector('mark');
+                        if (mark) {
+                            const item = mark.closest('.tc-item');
+                            if (item) container.scrollTop = item.offsetTop - container.offsetTop - 10;
+                        }
+                    }, 50);
+                }
             } else {
                 container.style.transition = 'none';
                 container.style.opacity = '0';
@@ -645,19 +730,19 @@ function renderAllStreams() {
 }
 
 function initYearFilters() {
-    const years = new Set();
-    allRows.forEach(row => { const y = row.getAttribute('data-year'); if(y && y!=='0000') years.add(y); });
-    const sorted = Array.from(years).sort().reverse();
+    const yearsSet = new Set();
+    allRows.forEach(row => { const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); });
+    const sortedYears = Array.from(yearsSet).sort().reverse();
     const container = document.getElementById('yearFilters');
     let html = '<button class="year-btn active" data-year="all">Все годы</button>';
-    sorted.forEach(y => html += `<button class="year-btn" data-year="${y}">${y} года</button>`);
+    sortedYears.forEach(y => html += `<button class="year-btn" data-year="${y}">${y} года</button>`);
     container.innerHTML = html;
     container.addEventListener('click', (e) => {
         if(e.target.classList.contains('year-btn')) {
             document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             activeYear = e.target.getAttribute('data-year');
-            executeSearch(document.getElementById('sInput').value.toLowerCase().trim());
+            executeSearch(searchInput.value.toLowerCase().trim());
         }
     });
 }
@@ -670,7 +755,9 @@ function renderTracklist(vId, container, filter) {
         tracks.forEach(tr => {
             let sText = tr.s;
             const normText = normalize(sText);
-            if (matchesWithVariants(normText, variants)) sText = highlightFirstMatch(sText, variants);
+            if (matchesWithVariants(normText, variants)) {
+                sText = highlightFirstMatch(sText, variants);
+            }
             const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
             html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${sText}</span></div>` : `<div class="tc-item"><span class="s-title">${sText}</span></div>`;
         });
@@ -680,19 +767,20 @@ function renderTracklist(vId, container, filter) {
             html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${tr.s}</span></div>` : `<div class="tc-item"><span class="s-title">${tr.s}</span></div>`;
         });
     }
-    if (songsDB[vId]?.author) html += `<div class="tc-author">Автор треклиста: ${songsDB[vId].author}</div>`;
+    const author = songsDB[vId]?.author;
+    if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${author}</div>`;
     container.innerHTML = html;
 }
 
 const searchInput = document.getElementById('sInput');
+const clearBtn = document.getElementById('sClear');
 const statsEl = document.getElementById('searchStats');
 
 async function executeSearch(filter) {
-    if (!allRows.length) await loadDatabase();
-    if (!allRows.length) return;
+    if (allRows.length === 0) return;
     let visibleCount = 0;
     const variants = filter ? getSearchVariants(filter) : [];
-    document.getElementById('sClear') && (document.getElementById('sClear').style.display = filter ? 'flex' : 'none');
+    clearBtn.style.display = filter ? 'flex' : 'none';
     allRows.forEach(row => {
         row.style.display = 'none';
         const details = row.querySelector('details');
@@ -708,10 +796,13 @@ async function executeSearch(filter) {
         return;
     }
     const matchedIds = new Set();
-    searchIndex.forEach(item => { if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id); });
+    searchIndex.forEach(item => {
+        if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id);
+    });
     const isDesktop = window.innerWidth > 768;
     allRows.forEach(row => {
-        const vId = row.getAttribute('data-id'), rowYear = row.getAttribute('data-year');
+        const vId = row.getAttribute('data-id');
+        const rowYear = row.getAttribute('data-year');
         if (activeYear !== 'all' && rowYear !== activeYear) return;
         if (!matchedIds.has(vId)) return;
         row.style.display = '';
@@ -723,29 +814,28 @@ async function executeSearch(filter) {
                 details.open = true;
                 renderTracklist(vId, tcList, filter);
                 animateContainer(tcList);
-                setTimeout(() => { const mark = tcList.querySelector('mark'); if(mark) mark.closest('.tc-item')?.scrollIntoView({block:'nearest'}); }, 50);
+                setTimeout(() => {
+                    const mark = tcList.querySelector('mark');
+                    if (mark) {
+                        const item = mark.closest('.tc-item');
+                        if (item) tcList.scrollTop = item.offsetTop - tcList.offsetTop - 10;
+                    }
+                }, 50);
             }
         }
     });
     statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
 }
 
-document.getElementById('scrollTopBtn').addEventListener('click', () => window.scrollTo({top:0,behavior:'smooth'}));
-window.addEventListener('scroll', () => { document.getElementById('scrollTopBtn').classList.toggle('show', window.scrollY>300); });
+const scrollBtn = document.getElementById('scrollTopBtn');
+window.addEventListener('scroll', () => { if (window.scrollY > 300) scrollBtn.classList.add('show'); else scrollBtn.classList.remove('show'); });
+scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDatabase();
     renderAllStreams();
     initYearFilters();
     executeSearch('');
-    const clearBtn = document.createElement('button');
-    clearBtn.id = 'sClear';
-    clearBtn.textContent = '✕';
-    clearBtn.style.cssText = 'position:absolute; right:14px; background:rgba(255,255,255,0.1); border:none; width:22px; height:22px; border-radius:50%; color:#94a3b8; cursor:pointer; display:none;';
-    document.querySelector('.search-box').style.position = 'relative';
-    document.querySelector('.search-box').appendChild(clearBtn);
-    clearBtn.onclick = () => { searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch(''); };
-    searchInput.addEventListener('input', () => { clearBtn.style.display = searchInput.value ? 'flex' : 'none'; clearTimeout(window.debounceTimer); window.debounceTimer = setTimeout(() => executeSearch(searchInput.value.toLowerCase().trim()), 700); });
 });
 
 document.getElementById('mainGrid').addEventListener('click', (e) => {
@@ -754,24 +844,26 @@ document.getElementById('mainGrid').addEventListener('click', (e) => {
         const time = e.target.getAttribute('data-time');
         const vId = e.target.closest('.row').getAttribute('data-id');
         const parts = time.split(':').map(Number);
-        const secs = parts.length===2 ? parts[0]*60+parts[1] : parts[0]*3600+parts[1]*60+parts[2];
+        const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
         window.open(`https://www.youtube.com/watch?v=${vId}&t=${secs}s`, '_blank');
     }
 });
+
+let debounceTimer;
+searchInput.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => executeSearch(searchInput.value.toLowerCase().trim()), 700); });
+clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch(''); });
 </script>
 </body>
 </html>"""
-    # Вставляем предзагруженные данные
-    final_html = html_template.replace('{preloaded_json}', preloaded_json).replace('{len(sorted_streams)}', str(len(sorted_streams)))
 
-    # Минификация
-    final_html = textwrap.dedent(final_html)
-    final_html = "\n".join(line.rstrip() for line in final_html.splitlines() if line.strip())
-    final_html = re.sub(r'>\s+<', '><', final_html)
-    final_html = re.sub(r'\n+', '\n', final_html)
+    # Минификация HTML
+    html_content = textwrap.dedent(html_template)
+    html_content = "\n".join(line.rstrip() for line in html_content.splitlines() if line.strip())
+    html_content = re.sub(r'>\s+<', '><', html_content)
+    html_content = re.sub(r'\n+', '\n', html_content)
 
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
-        f.write(final_html)
+        f.write(html_content)
     print(f"[HTML обновлён] {os.path.abspath(OUTPUT_HTML)}")
 
 
@@ -809,9 +901,6 @@ def run_parser():
             if not videos_to_parse:
                 print("Новых трансляций нет. База актуальна.")
                 generate_html_report()
-                all_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
-                generate_sitemap(all_streams)
-                generate_robots_txt()
                 return
 
             print(f"2. Парсинг {len(videos_to_parse)} видео (комментарии через API)...")
@@ -820,10 +909,6 @@ def run_parser():
 
             print("\n3. Готово.")
             generate_html_report()
-            db_updated = load_database()
-            all_streams = sorted(db_updated.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
-            generate_sitemap(all_streams)
-            generate_robots_txt()
     except Exception as e:
         print(f"\nКРИТИЧЕСКАЯ ОШИБКА: {e}")
         sys.exit(1)
