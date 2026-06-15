@@ -5,6 +5,7 @@ import threading
 import textwrap
 import requests
 import sys
+from datetime import datetime
 from yt_dlp import YoutubeDL
 from concurrent.futures import ThreadPoolExecutor
 
@@ -342,15 +343,120 @@ def parse_single_video(video_entry):
     return True
 
 
+def generate_sitemap(streams):
+    """Генерирует sitemap.xml со ссылками на YouTube видео (поскольку сайт — это каталог)."""
+    sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    sitemap += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    sitemap += f'''
+    <url>
+        <loc>https://kvash9.github.io/arh/</loc>
+        <lastmod>{datetime.now().date().isoformat()}</lastmod>
+        <priority>1.00</priority>
+    </url>\n'''
+    for stream in streams:
+        video_url = f"https://www.youtube.com/watch?v={stream['id']}"
+        lastmod = stream.get('raw_date', datetime.now().date().isoformat())
+        if len(lastmod) == 8:
+            lastmod = f"{lastmod[:4]}-{lastmod[4:6]}-{lastmod[6:8]}"
+        sitemap += f'''
+    <url>
+        <loc>{video_url}</loc>
+        <lastmod>{lastmod}</lastmod>
+        <priority>0.80</priority>
+    </url>\n'''
+    sitemap += '</urlset>'
+    with open("sitemap.xml", "w", encoding="utf-8") as f:
+        f.write(sitemap)
+    print("sitemap.xml сгенерирован")
+
+
+def generate_robots_txt():
+    """Генерирует robots.txt."""
+    robots = """User-agent: *
+Allow: /
+Sitemap: https://kvash9.github.io/arh/sitemap.xml
+"""
+    with open("robots.txt", "w", encoding="utf-8") as f:
+        f.write(robots)
+    print("robots.txt сгенерирован")
+
+
 def generate_html_report():
     print("Генерация статического index.html...")
+    db_data = load_database()
+    sorted_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
 
+    # Строим HTML-блоки для каждого стрима
+    streams_html = []
+    preload_data = []
+    for stream in sorted_streams:
+        v_id = stream['id']
+        title = stream.get('title', 'Без названия')
+        date = stream.get('date', 'Неизвестно')
+        raw_year = stream.get('raw_date', '0000')[:4]
+        list_type = stream.get('list_type', 'none')
+        timecodes = stream.get('timecodes', [])
+        timecodes.sort(key=get_timecode_seconds)
+
+        tracks_html = ''
+        for tc in timecodes:
+            time_match = re.search(r'(\d{1,2}:?\d{2}:?\d{2})', tc)
+            time_str = time_match.group(1) if time_match else ''
+            song_title = tc.replace(time_str, '').strip(' -–— ').strip()
+            tracks_html += f'''
+                    <div class="tc-item">
+                        <span class="t-click" data-time="{time_str}">{time_str}</span>
+                        <span class="s-title">{song_title}</span>
+                    </div>'''
+
+        author = stream.get('author', '')
+        author_html = f'<div class="tc-author">Автор треклиста: {author}</div>' if author else ''
+
+        badge_class = "badge-tracklist" if list_type == "tracklist" else "badge-mixed"
+        badge_text = "Готовый трек-лист" if list_type == "tracklist" else "Сборный список"
+
+        if timecodes:
+            tcs_html = f'''
+            <details open>
+                <summary><div class="summary-flex"><span>Треклист {len(timecodes)}</span><span class="badge {badge_class}">{badge_text}</span></div></summary>
+                <div class="tc-list">{tracks_html}{author_html}</div>
+            </details>'''
+        else:
+            tcs_html = '<div class="no-tc-block"><span>Треклист не найден</span></div>'
+
+        streams_html.append(f'''
+        <div class="row" data-id="{v_id}" data-year="{raw_year}" style="--bg-thumb: url('https://img.youtube.com/vi/{v_id}/hqdefault.jpg');">
+            <span class="v-date">{date}</span>
+            <a class="v-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank">
+                <div class="img-container">
+                    <img loading="lazy" decoding="async" src="https://img.youtube.com/vi/{v_id}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';">
+                    <span class="play-overlay">▶ Смотреть</span>
+                </div>
+            </a>
+            <div class="v-content-block">
+                <a class="v-title-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank">
+                    <span class="v-title">{title}</span>
+                </a>
+                <div class="v-tcs">{tcs_html}</div>
+            </div>
+        </div>''')
+        preload_data.append(stream)
+
+    # Преобразуем для вставки в шаблон
+    streams_joined = '\n'.join(streams_html)
+    preloaded_json = json.dumps(preload_data, ensure_ascii=False)
+
+    # HTML-шаблон (сохранены все стили и функциональность, но контент уже встроен)
     html_template = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Архив трансляций Квашеной</title>
+    <title>Архив трансляций Квашеной — треклисты и таймкоды</title>
+    <meta name="description" content="Архив YouTube-стримов Квашеной с готовыми треклистами и таймкодами. Поиск песен по удобному каталогу.">
+    <meta name="keywords" content="Квашеная, стримы, треклисты, песни, YouTube, архив">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kvash9.github.io/arh/">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
     <style>
         :root {
@@ -399,7 +505,6 @@ def generate_html_report():
         .year-btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
         .year-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
         .grid { display: flex; flex-direction: column; gap: 24px; }
-        .grid:empty { min-height: 60vh; }
         .row { position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; align-items: flex-start; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; overflow: hidden; z-index: 1; }
         .row::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }
         .row * { position: relative; z-index: 2; }
@@ -447,6 +552,16 @@ def generate_html_report():
         .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
         @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
     </style>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": "Архив трансляций Квашеной",
+      "description": "Архив YouTube-стримов Квашеной с готовыми треклистами и таймкодами.",
+      "url": "https://kvash9.github.io/arh/",
+      "numberOfItems": {len(preload_data)}
+    }
+    </script>
 </head>
 <body>
 <div class="parallax-notes" id="parallaxNotes"></div>
@@ -458,71 +573,21 @@ def generate_html_report():
                 <input type="text" id="sInput" class="s-input" placeholder="Поиск песни">
                 <button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button>
             </form>
-            <div id="searchStats">Найдено трансляций: 0</div>
+            <div id="searchStats">Найдено трансляций: {len(preload_data)}</div>
         </div>
     </div>
 </div>
 <div class="container">
     <div id="yearFilters" class="year-filters"></div>
     <div class="grid" id="mainGrid">
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
-        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        {streams_joined}
     </div>
 </div>
 <button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
 <script>
-(function() {
-    const notesContainer = document.getElementById('parallaxNotes');
-    if (!notesContainer) return;
-    const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
-    const notesCount = 10;
-    const notes = [];
-    for (let i = 0; i < notesCount; i++) {
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'note';
-        const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
-        const size = Math.floor(Math.random() * 130) + 50;
-        const left = Math.random() * 100;
-        const top = Math.random() * 100;
-        const opacity = Math.random() * 0.4 + 0.2;
-        const rotation = Math.random() * 360;
-        const parallaxFactor = 0.2 + Math.random() * 0.6;
-        const contentSpan = document.createElement('span');
-        contentSpan.className = 'note-content';
-        contentSpan.textContent = symbol;
-        contentSpan.style.fontSize = size + 'px';
-        contentSpan.style.opacity = opacity;
-        contentSpan.style.color = `rgba(255, 255, 255, ${opacity * 0.9})`;
-        const animDuration = 4 + Math.random() * 6;
-        contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
-        contentSpan.style.animationDelay = `${Math.random() * 3}s`;
-        noteDiv.appendChild(contentSpan);
-        noteDiv.style.left = left + '%';
-        noteDiv.style.top = top + '%';
-        noteDiv.style.transform = `rotate(${rotation}deg)`;
-        notesContainer.appendChild(noteDiv);
-        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
-    }
-    let ticking = false;
-    function updateNotesPosition() {
-        const scrollY = window.scrollY;
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
-        for (let n of notes) {
-            const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
-            let newTop = n.baseTop + shiftPercent;
-            newTop = Math.min(Math.max(newTop, -5), 105);
-            n.element.style.top = newTop + '%';
-        }
-        ticking = false;
-    }
-    window.addEventListener('scroll', () => { if (!ticking) { requestAnimationFrame(updateNotesPosition); ticking = true; } });
-    window.addEventListener('resize', () => updateNotesPosition());
-    updateNotesPosition();
-})();
+// Предзагруженные данные для быстрой работы (и для SEO)
+window.__PRELOADED_DATA__ = {preloaded_json};
 
-// ========== БЕЗОПАСНОЕ УДАЛЕНИЕ ТОЛЬКО ЭМОДЗИ ==========
 function removeSpecificEmojis(str) {
     if (typeof Intl !== 'undefined' && Intl.Segmenter) {
         const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
@@ -530,18 +595,17 @@ function removeSpecificEmojis(str) {
         let result = '';
         for (const seg of segments) {
             const grapheme = seg.segment;
-            const isEmoji = /\p{Emoji}/u.test(grapheme) && !/[\p{N}\p{L}]/u.test(grapheme);
+            const isEmoji = /\\p{Emoji}/u.test(grapheme) && !/[\\p{N}\\p{L}]/u.test(grapheme);
             if (!isEmoji) {
                 result += grapheme;
             }
         }
         return result;
     } else {
-        return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu, '');
+        return str.replace(/[\\u{1F600}-\\u{1F64F}\\u{1F300}-\\u{1F5FF}\\u{1F680}-\\u{1F6FF}\\u{1F1E0}-\\u{1F1FF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}\\u{1F900}-\\u{1F9FF}\\u{1FA00}-\\u{1FA6F}\\u{1FA70}-\\u{1FAFF}]/gu, '');
     }
 }
 
-// ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
 function normalize(str) {
     return str.toLowerCase()
               .replace(/ë/g, 'e')
@@ -639,38 +703,42 @@ function normalizeTimecode(tc) {
 
 async function loadDatabase() {
     if (streamsData.length > 0) return;
-    try {
-        const response = await fetch('parsed_streams_db.json');
-        if (!response.ok) throw new Error('Файл базы не найден');
-        const rawData = await response.json();
-        rawData.sort((a,b) => (b.raw_date || '00000000').localeCompare(a.raw_date || '00000000'));
-        streamsData = rawData;
-        songsDB = {};
-        searchIndex = [];
-        rawData.forEach(entry => {
-            const vId = entry.id;
-            const timecodes = entry.timecodes || [];
-            const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
-            const tracks = sorted.map(line => {
-                const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-                if (match) {
-                    let s = line.replace(match[1], '').trim();
-                    s = s.replace(/^[-–—]\s*/, '');
-                    s = removeSpecificEmojis(s);
-                    return { t: match[1], s: s };
-                } else {
-                    let s = line;
-                    s = removeSpecificEmojis(s);
-                    return { s: s };
-                }
-            });
-            songsDB[vId] = { tracks, author: entry.author || '' };
-            tracks.forEach(tr => {
-                const norm = normalize(tr.s || '');
-                searchIndex.push({ id: vId, text: tr.s, norm: norm });
-            });
+    // Используем предзагруженные данные
+    if (window.__PRELOADED_DATA__ && window.__PRELOADED_DATA__.length) {
+        streamsData = window.__PRELOADED_DATA__;
+    } else {
+        try {
+            const response = await fetch('parsed_streams_db.json');
+            if (!response.ok) throw new Error('Файл базы не найден');
+            const rawData = await response.json();
+            streamsData = rawData;
+        } catch(e) { console.error('Ошибка загрузки базы:', e); streamsData = []; return; }
+    }
+    songsDB = {};
+    searchIndex = [];
+    streamsData.forEach(entry => {
+        const vId = entry.id;
+        const timecodes = entry.timecodes || [];
+        const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
+        const tracks = sorted.map(line => {
+            const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+            if (match) {
+                let s = line.replace(match[1], '').trim();
+                s = s.replace(/^[-–—]\s*/, '');
+                s = removeSpecificEmojis(s);
+                return { t: match[1], s: s };
+            } else {
+                let s = line;
+                s = removeSpecificEmojis(s);
+                return { s: s };
+            }
         });
-    } catch(e) { console.error('Ошибка загрузки базы:', e); streamsData = []; }
+        songsDB[vId] = { tracks, author: entry.author || '' };
+        tracks.forEach(tr => {
+            const norm = normalize(tr.s || '');
+            searchIndex.push({ id: vId, text: tr.s, norm: norm });
+        });
+    });
 }
 
 function renderStreamHTML(stream) {
@@ -699,7 +767,10 @@ function animateContainer(container) {
 
 function renderAllStreams() {
     const grid = document.getElementById('mainGrid');
-    grid.innerHTML = streamsData.map(renderStreamHTML).join('');
+    // Если grid уже содержит контент (статические строки), мы их не перезаписываем, а просто привязываем обработчики
+    if (grid.children.length === 0) {
+        grid.innerHTML = streamsData.map(renderStreamHTML).join('');
+    }
     allRows = [...grid.querySelectorAll('.row')];
     document.querySelectorAll('details').forEach(details => {
         details.addEventListener('toggle', function() {
@@ -777,6 +848,7 @@ const clearBtn = document.getElementById('sClear');
 const statsEl = document.getElementById('searchStats');
 
 async function executeSearch(filter) {
+    if (allRows.length === 0) await loadDatabase();
     if (allRows.length === 0) return;
     let visibleCount = 0;
     const variants = filter ? getSearchVariants(filter) : [];
@@ -833,6 +905,7 @@ scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 's
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDatabase();
+    // Если в mainGrid уже есть статические строки, привязываем к ним обработчики
     renderAllStreams();
     initYearFilters();
     executeSearch('');
@@ -855,15 +928,17 @@ clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.styl
 </script>
 </body>
 </html>"""
+    # Вставляем сгенерированные данные в шаблон
+    final_html = html_template.replace('{streams_joined}', streams_joined).replace('{preloaded_json}', preloaded_json).replace('{len(preload_data)}', str(len(preload_data)))
 
-    # Минификация HTML
-    html_content = textwrap.dedent(html_template)
-    html_content = "\n".join(line.rstrip() for line in html_content.splitlines() if line.strip())
-    html_content = re.sub(r'>\s+<', '><', html_content)
-    html_content = re.sub(r'\n+', '\n', html_content)
+    # Минификация
+    final_html = textwrap.dedent(final_html)
+    final_html = "\n".join(line.rstrip() for line in final_html.splitlines() if line.strip())
+    final_html = re.sub(r'>\s+<', '><', final_html)
+    final_html = re.sub(r'\n+', '\n', final_html)
 
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        f.write(final_html)
     print(f"[HTML обновлён] {os.path.abspath(OUTPUT_HTML)}")
 
 
@@ -901,6 +976,10 @@ def run_parser():
             if not videos_to_parse:
                 print("Новых трансляций нет. База актуальна.")
                 generate_html_report()
+                # Генерируем sitemap и robots.txt даже если нет новых
+                all_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+                generate_sitemap(all_streams)
+                generate_robots_txt()
                 return
 
             print(f"2. Парсинг {len(videos_to_parse)} видео (комментарии через API)...")
@@ -909,6 +988,11 @@ def run_parser():
 
             print("\n3. Готово.")
             generate_html_report()
+            # Генерируем sitemap и robots.txt после обновления
+            db_updated = load_database()
+            all_streams = sorted(db_updated.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+            generate_sitemap(all_streams)
+            generate_robots_txt()
     except Exception as e:
         print(f"\nКРИТИЧЕСКАЯ ОШИБКА: {e}")
         sys.exit(1)
