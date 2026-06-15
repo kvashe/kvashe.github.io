@@ -13,7 +13,7 @@ API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 if not API_KEY:
     raise ValueError("Переменная окружения YOUTUBE_API_KEY не установлена")
 
-SITE_URL = "https://kvash9.github.io/arh"
+SITE_URL = "https://kvashe.github.io/arh"
 
 CHANNEL_STREAMS_URL = 'https://www.youtube.com/@kvashenaya/streams'
 DB_FILE = "parsed_streams_db.json"
