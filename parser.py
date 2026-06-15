@@ -344,7 +344,6 @@ def parse_single_video(video_entry):
 
 
 def generate_sitemap(streams):
-    """Генерирует sitemap.xml со ссылками на YouTube видео (поскольку сайт — это каталог)."""
     sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n'
     sitemap += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     sitemap += f'''
@@ -371,7 +370,6 @@ def generate_sitemap(streams):
 
 
 def generate_robots_txt():
-    """Генерирует robots.txt."""
     robots = """User-agent: *
 Allow: /
 Sitemap: https://kvash9.github.io/arh/sitemap.xml
@@ -386,67 +384,11 @@ def generate_html_report():
     db_data = load_database()
     sorted_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
 
-    # Строим HTML-блоки для каждого стрима
-    streams_html = []
-    preload_data = []
-    for stream in sorted_streams:
-        v_id = stream['id']
-        title = stream.get('title', 'Без названия')
-        date = stream.get('date', 'Неизвестно')
-        raw_year = stream.get('raw_date', '0000')[:4]
-        list_type = stream.get('list_type', 'none')
-        timecodes = stream.get('timecodes', [])
-        timecodes.sort(key=get_timecode_seconds)
+    # Сохраняем данные для предзагрузки
+    preloaded_json = json.dumps(sorted_streams, ensure_ascii=False)
 
-        tracks_html = ''
-        for tc in timecodes:
-            time_match = re.search(r'(\d{1,2}:?\d{2}:?\d{2})', tc)
-            time_str = time_match.group(1) if time_match else ''
-            song_title = tc.replace(time_str, '').strip(' -–— ').strip()
-            tracks_html += f'''
-                    <div class="tc-item">
-                        <span class="t-click" data-time="{time_str}">{time_str}</span>
-                        <span class="s-title">{song_title}</span>
-                    </div>'''
-
-        author = stream.get('author', '')
-        author_html = f'<div class="tc-author">Автор треклиста: {author}</div>' if author else ''
-
-        badge_class = "badge-tracklist" if list_type == "tracklist" else "badge-mixed"
-        badge_text = "Готовый трек-лист" if list_type == "tracklist" else "Сборный список"
-
-        if timecodes:
-            tcs_html = f'''
-            <details open>
-                <summary><div class="summary-flex"><span>Треклист {len(timecodes)}</span><span class="badge {badge_class}">{badge_text}</span></div></summary>
-                <div class="tc-list">{tracks_html}{author_html}</div>
-            </details>'''
-        else:
-            tcs_html = '<div class="no-tc-block"><span>Треклист не найден</span></div>'
-
-        streams_html.append(f'''
-        <div class="row" data-id="{v_id}" data-year="{raw_year}" style="--bg-thumb: url('https://img.youtube.com/vi/{v_id}/hqdefault.jpg');">
-            <span class="v-date">{date}</span>
-            <a class="v-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank">
-                <div class="img-container">
-                    <img loading="lazy" decoding="async" src="https://img.youtube.com/vi/{v_id}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';">
-                    <span class="play-overlay">▶ Смотреть</span>
-                </div>
-            </a>
-            <div class="v-content-block">
-                <a class="v-title-link" href="https://www.youtube.com/watch?v={v_id}" target="_blank">
-                    <span class="v-title">{title}</span>
-                </a>
-                <div class="v-tcs">{tcs_html}</div>
-            </div>
-        </div>''')
-        preload_data.append(stream)
-
-    # Преобразуем для вставки в шаблон
-    streams_joined = '\n'.join(streams_html)
-    preloaded_json = json.dumps(preload_data, ensure_ascii=False)
-
-    # HTML-шаблон (сохранены все стили и функциональность, но контент уже встроен)
+    # Формируем базовый HTML-шаблон (без статических строк, всё через JS)
+    # Но для SEO оставляем пустой контейнер, данные будут подгружены через предзагрузку
     html_template = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -459,6 +401,7 @@ def generate_html_report():
     <link rel="canonical" href="https://kvash9.github.io/arh/">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
     <style>
+        /* ваш полный стиль (оставьте как было, я не буду повторять для краткости, но в финальном коде он должен быть) */
         :root {
             --primary: #6366f1;
             --primary-hover: #4f46e5;
@@ -559,7 +502,7 @@ def generate_html_report():
       "name": "Архив трансляций Квашеной",
       "description": "Архив YouTube-стримов Квашеной с готовыми треклистами и таймкодами.",
       "url": "https://kvash9.github.io/arh/",
-      "numberOfItems": {len(preload_data)}
+      "numberOfItems": {len(sorted_streams)}
     }
     </script>
 </head>
@@ -573,19 +516,21 @@ def generate_html_report():
                 <input type="text" id="sInput" class="s-input" placeholder="Поиск песни">
                 <button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button>
             </form>
-            <div id="searchStats">Найдено трансляций: {len(preload_data)}</div>
+            <div id="searchStats">Найдено трансляций: {len(sorted_streams)}</div>
         </div>
     </div>
 </div>
 <div class="container">
     <div id="yearFilters" class="year-filters"></div>
     <div class="grid" id="mainGrid">
-        {streams_joined}
+        <!-- Скелетоны для загрузки -->
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
+        <div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div>
     </div>
 </div>
 <button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
 <script>
-// Предзагруженные данные для быстрой работы (и для SEO)
 window.__PRELOADED_DATA__ = {preloaded_json};
 
 function removeSpecificEmojis(str) {
@@ -703,7 +648,6 @@ function normalizeTimecode(tc) {
 
 async function loadDatabase() {
     if (streamsData.length > 0) return;
-    // Используем предзагруженные данные
     if (window.__PRELOADED_DATA__ && window.__PRELOADED_DATA__.length) {
         streamsData = window.__PRELOADED_DATA__;
     } else {
@@ -767,10 +711,7 @@ function animateContainer(container) {
 
 function renderAllStreams() {
     const grid = document.getElementById('mainGrid');
-    // Если grid уже содержит контент (статические строки), мы их не перезаписываем, а просто привязываем обработчики
-    if (grid.children.length === 0) {
-        grid.innerHTML = streamsData.map(renderStreamHTML).join('');
-    }
+    grid.innerHTML = streamsData.map(renderStreamHTML).join('');
     allRows = [...grid.querySelectorAll('.row')];
     document.querySelectorAll('details').forEach(details => {
         details.addEventListener('toggle', function() {
@@ -905,7 +846,6 @@ scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 's
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDatabase();
-    // Если в mainGrid уже есть статические строки, привязываем к ним обработчики
     renderAllStreams();
     initYearFilters();
     executeSearch('');
@@ -928,8 +868,9 @@ clearBtn.addEventListener('click', () => { searchInput.value = ''; clearBtn.styl
 </script>
 </body>
 </html>"""
-    # Вставляем сгенерированные данные в шаблон
-    final_html = html_template.replace('{streams_joined}', streams_joined).replace('{preloaded_json}', preloaded_json).replace('{len(preload_data)}', str(len(preload_data)))
+
+    # Вставляем предзагруженные данные и количество
+    final_html = html_template.replace('{preloaded_json}', preloaded_json).replace('{len(sorted_streams)}', str(len(sorted_streams)))
 
     # Минификация
     final_html = textwrap.dedent(final_html)
@@ -976,7 +917,6 @@ def run_parser():
             if not videos_to_parse:
                 print("Новых трансляций нет. База актуальна.")
                 generate_html_report()
-                # Генерируем sitemap и robots.txt даже если нет новых
                 all_streams = sorted(db_data.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
                 generate_sitemap(all_streams)
                 generate_robots_txt()
@@ -988,7 +928,6 @@ def run_parser():
 
             print("\n3. Готово.")
             generate_html_report()
-            # Генерируем sitemap и robots.txt после обновления
             db_updated = load_database()
             all_streams = sorted(db_updated.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
             generate_sitemap(all_streams)
