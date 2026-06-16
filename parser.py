@@ -971,7 +971,7 @@ def run_parser():
                 video_id = entry.get('id')
                 if not video_id:
                     continue
-                if video_id in db_data and db_data[video_id].get('list_type') in ('tracklist', 'mixed'):
+                if video_id in db_data and db_data[video_id].get('list_type') == 'tracklist':
                     continue
                 videos_to_parse.append({
                     'id': video_id,
