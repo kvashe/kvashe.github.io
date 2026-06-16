@@ -423,7 +423,7 @@ def generate_html_report():
     <meta property="og:description" content="Все песни с трансляций – поиск по трекам и таймкодам.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="%s/index.html">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%%22http://www.w3.org/2000/svg%%22 viewBox=%%220 0 100 100%%22><text y=%%22.9em%%22 font-size=%%2290%%22>🎵</text></svg>">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <style>
         :root {
             --primary: #6366f1;
