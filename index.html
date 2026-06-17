@@ -199,35 +199,41 @@ function matchesWithVariants(textNorm, variants) {
     }
     return false;
 }
-function highlightFirstMatch(original, variants) {
-    if (!variants || variants.length === 0) return original;
-    const normOriginal = normalize(original);
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+function highlightFirstMatch(escapedText, variants) {
+    if (!variants || variants.length === 0) return escapedText;
+    const normEscaped = normalize(escapedText);
     let bestMatch = null;
     let bestIndex = Infinity;
     for (let v of variants) {
-        const idx = normOriginal.indexOf(v);
+        const normV = normalize(v);
+        const idx = normEscaped.indexOf(normV);
         if (idx !== -1 && idx < bestIndex) {
             bestIndex = idx;
-            bestMatch = v;
+            bestMatch = normV;
         }
     }
-    if (bestMatch === null) return original;
+    if (bestMatch === null) return escapedText;
     let origIdx = 0, normIdx = 0;
-    while (normIdx < bestIndex && origIdx < original.length) {
-        const ch = original[origIdx];
+    while (normIdx < bestIndex && origIdx < escapedText.length) {
+        const ch = escapedText[origIdx];
         const nch = normalize(ch);
         if (nch.length > 0) normIdx++;
         origIdx++;
     }
-    const startOrig = origIdx;
-    while (normIdx < bestIndex + bestMatch.length && origIdx < original.length) {
-        const ch = original[origIdx];
+    const start = origIdx;
+    while (normIdx < bestIndex + bestMatch.length && origIdx < escapedText.length) {
+        const ch = escapedText[origIdx];
         const nch = normalize(ch);
         if (nch.length > 0) normIdx++;
         origIdx++;
     }
-    const endOrig = origIdx;
-    return original.substring(0, startOrig) + '<mark>' + original.substring(startOrig, endOrig) + '</mark>' + original.substring(endOrig);
+    const end = origIdx;
+    return escapedText.substring(0, start) + '<mark>' + escapedText.substring(start, end) + '</mark>' + escapedText.substring(end);
 }
 let streamsData = [];
 let songsDB = {};
@@ -248,7 +254,6 @@ function normalizeTimecode(tc) {
     if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
     return tc;
 }
-// ========== ЗАГРУЗКА ДАННЫХ (показываем tracklist и mixed) ==========
 async function loadDatabase() {
     if (streamsData.length > 0) return;
     try {
@@ -284,11 +289,10 @@ async function loadDatabase() {
         });
     } catch(e) { console.error('Ошибка загрузки базы:', e); streamsData = []; }
 }
-// ========== РЕНДЕР ОДНОГО СТРИМА (с разными бейджами) ==========
 function renderStreamHTML(stream) {
     const vId = stream.id;
-    const title = stream.title || 'Без названия';
-    const date = stream.date || 'Неизвестно';
+    const title = escapeHtml(stream.title || 'Без названия');
+    const date = escapeHtml(stream.date || 'Неизвестно');
     const rawYear = (stream.raw_date || '0000').substring(0,4);
     const timecodes = stream.timecodes || [];
     const listType = stream.list_type || 'none';
@@ -362,6 +366,7 @@ function renderTracklist(vId, container, filter) {
         const variants = getSearchVariants(filter);
         tracks.forEach(tr => {
             let sText = tr.s;
+            sText = escapeHtml(sText);
             const normText = normalize(sText);
             if (matchesWithVariants(normText, variants)) {
                 sText = highlightFirstMatch(sText, variants);
@@ -372,11 +377,12 @@ function renderTracklist(vId, container, filter) {
     } else {
         tracks.forEach(tr => {
             const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${tr.s}</span></div>` : `<div class="tc-item"><span class="s-title">${tr.s}</span></div>`;
+            const safeText = escapeHtml(tr.s);
+            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${safeText}</span></div>` : `<div class="tc-item"><span class="s-title">${safeText}</span></div>`;
         });
     }
     const author = songsDB[vId]?.author;
-    if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${author}</div>`;
+    if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${escapeHtml(author)}</div>`;
     container.innerHTML = html;
 }
 const searchInput = document.getElementById('sInput');
