@@ -5,6 +5,7 @@ import threading
 import textwrap
 import requests
 import sys
+import datetime  # добавлено для работы с датами комментариев
 from yt_dlp import YoutubeDL
 from concurrent.futures import ThreadPoolExecutor
 
@@ -35,6 +36,9 @@ FORBIDDEN_PHRASES = [
     "пой без кривляний",
     "но вот играть на ней ты явно неумеешь",
 ]
+
+# Глобальный флаг подробного логирования
+DEBUG = True
 # ===================================================
 
 db_lock = threading.Lock()
@@ -184,16 +188,29 @@ def extract_smart_timecodes(comments):
     mixed_lines = []
     mixed_authors = set()
 
-    print(f"    [DEBUG] Всего комментариев с таймкодами для анализа: {len(comments) if comments else 0}")
-    if comments:
-        for idx, c in enumerate(comments[:10]):
-            print(f"    [DEBUG] Комментарий {idx+1}: автор='{c.get('author', '?')}', текст='{c.get('text', '')[:80]}...'")
+    # Общая статистика
+    total_comments = len(comments) if comments else 0
+    comments_with_timecodes = 0
+    skipped_forbidden = 0
+    skipped_low_tc = 0
+    skipped_transcript = 0
+    skipped_other = 0
+
+    if DEBUG:
+        print(f"    [DEBUG] Всего комментариев для анализа: {total_comments}")
+        if comments:
+            # Покажем первые 3 комментария для быстрого понимания
+            for idx, c in enumerate(comments[:3]):
+                print(f"    [DEBUG] Комм. {idx+1}: автор='{c.get('author','?')}', текст='{c.get('text','')[:80]}...'")
 
     for comment in comments:
         text = comment.get('text', '')
         text_lower = text.lower()
+        # Проверка запрещённых фраз
         if any(phrase.lower() in text_lower for phrase in FORBIDDEN_PHRASES):
-            print(f"    [DEBUG] Игнорируем комментарий автора {comment.get('author', '?')} (содержит запрещённую фразу)")
+            if DEBUG:
+                print(f"    [DEBUG] Пропущен (запрещ. фраза) автор: {comment.get('author','?')}")
+            skipped_forbidden += 1
             continue
 
         all_lines = [
@@ -201,6 +218,11 @@ def extract_smart_timecodes(comments):
             for line in text.split('\n')
             if re.search(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b', line)
         ]
+        if not all_lines:
+            skipped_other += 1
+            continue
+
+        comments_with_timecodes += 1
         valid_lines = [
             clean_timecode_range(line)
             for line in all_lines
@@ -210,7 +232,12 @@ def extract_smart_timecodes(comments):
 
         if tc_count >= MIN_TIMECODES_COUNT:
             if is_transcript_like(valid_lines):
+                if DEBUG:
+                    print(f"    [DEBUG] Пропущен (похож на транскрипт) автор: {comment.get('author','?')}")
+                skipped_transcript += 1
                 continue
+
+            # Подсчёт music_score
             music_score = 0
             for line in valid_lines:
                 if ' - ' in line:
@@ -228,7 +255,8 @@ def extract_smart_timecodes(comments):
             author = comment.get('author', 'Неизвестно')
             if author in ("@ajoajo701", "@mirovoy100"):
                 music_score = -1_000_000
-                print(f"    [DEBUG] Автор {author} получает штраф")
+                if DEBUG:
+                    print(f"    [DEBUG] Автор {author} получает штраф -1 000 000 баллов")
 
             candidates.append({
                 'text': text,
@@ -236,26 +264,64 @@ def extract_smart_timecodes(comments):
                 'tc_count': tc_count,
                 'music_score': music_score,
                 'author': author,
+                'published_at': comment.get('published_at', '')
             })
-        elif tc_count > 0:
+        else:
+            # Мало таймкодов, но что-то есть – добавим в смешанный пул
+            skipped_low_tc += 1
             mixed_lines.extend(valid_lines)
             mixed_authors.add(comment.get('author', 'Неизвестно'))
 
+    if DEBUG:
+        print(f"    [DEBUG] Статистика комментариев:")
+        print(f"        всего: {total_comments}")
+        print(f"        содержат таймкоды: {comments_with_timecodes}")
+        print(f"        отброшено (запрещ. фразы): {skipped_forbidden}")
+        print(f"        отброшено (мало таймкодов): {skipped_low_tc}")
+        print(f"        отброшено (похожи на транскрипт): {skipped_transcript}")
+        print(f"        кандидатов в треклист: {len(candidates)}")
+        if candidates:
+            print(f"    [DEBUG] Таблица кандидатов:")
+            print(f"        {'Автор':<20} {'tc':<5} {'score':<8} {'дата':<25}")
+            for c in candidates:
+                print(f"        {c['author']:<20} {c['tc_count']:<5} {c['music_score']:<8} {c['published_at']:<25}")
+
     if candidates:
-        best = max(candidates, key=lambda c: (c['music_score'], c['tc_count']))
-        print(f"    [DEBUG] Выбран кандидат от автора: {best['author']}")
+        # Сортировка по music_score (по убыванию), tc_count (по убыванию), published_at (по возрастанию)
+        def _ts(date_str):
+            try:
+                dt = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                return dt.timestamp()
+            except Exception:
+                return 9999999999
+
+        best = max(candidates, key=lambda c: (c['music_score'], c['tc_count'], -_ts(c.get('published_at', ''))))
+        if DEBUG:
+            print(f"    [DEBUG] Выбран лучший кандидат: {best['author']}")
+            print(f"            music_score={best['music_score']}, tc_count={best['tc_count']}, published_at={best['published_at']}")
+            # Покажем, были ли равные по score
+            equal_score = [c for c in candidates if c['music_score'] == best['music_score']]
+            if len(equal_score) > 1:
+                print(f"            (кандидатов с таким же score: {len(equal_score)}; выбран самый старый)")
+
         return (
             sorted(list(set(best['valid_lines'])), key=get_timecode_seconds),
             "tracklist",
             best['author']
         )
+
     if mixed_lines:
         unique_lines = sorted(list(set(mixed_lines)), key=get_timecode_seconds)
         authors_str = ", ".join(list(mixed_authors)[:3])
         if len(mixed_authors) > 3:
             authors_str += " и др."
-        print(f"    [DEBUG] Смешанный режим, авторы: {authors_str}")
+        if DEBUG:
+            print(f"    [DEBUG] Смешанный режим (не набралось полноценного треклиста). Авторы фрагментов: {authors_str}")
+            print(f"            Количество уникальных строк: {len(unique_lines)}")
         return unique_lines, "mixed", authors_str
+
+    if DEBUG:
+        print(f"    [DEBUG] Треклист не найден (0 кандидатов, 0 смешанных строк)")
     return [], "none", ""
 
 
@@ -291,6 +357,7 @@ def get_video_comments_via_api(video_id, max_comments=3000):
                 "text": snippet.get("textDisplay", ""),
                 "author": snippet.get("authorDisplayName", ""),
                 "is_pinned": False,
+                "published_at": snippet.get("publishedAt", "")
             })
             if len(comments) >= max_comments:
                 break
@@ -305,15 +372,16 @@ def get_video_comments_via_api(video_id, max_comments=3000):
 def parse_single_video(video_entry):
     video_id = video_entry.get('id')
     title = video_entry.get('title', 'No Title')
-    print(f"    [СТАРТ ПАРСИНГА] -> {title[:30]}...")
+    print(f"\n    [СТАРТ ПАРСИНГА] -> {title[:60]}...")
 
     comments = get_video_comments_via_api(video_id)
 
-    if comments:
-        first_text = comments[0].get('text', '')[:150]
-        print(f"    [ДИАГНОСТИКА] Первый комментарий: {first_text}...")
-    else:
-        print("    [ДИАГНОСТИКА] Комментариев не найдено")
+    if DEBUG:
+        if comments:
+            first_text = comments[0].get('text', '')[:120]
+            print(f"    [ДИАГНОСТИКА] Получено комментариев: {len(comments)}. Первый: {first_text}...")
+        else:
+            print("    [ДИАГНОСТИКА] Комментариев не найдено (возможно, отключены)")
 
     timecodes, list_type, author = extract_smart_timecodes(comments)
 
@@ -341,7 +409,7 @@ def parse_single_video(video_entry):
         "list_type": list_type, "author": author
     }
     save_single_video_to_db(video_id, video_data)
-    print(f"    [СОХРАНЕНО] -> {title[:25]}... ({formatted_date}) автор={author}")
+    print(f"    [СОХРАНЕНО] -> {title[:50]}... ({formatted_date}) автор={author}, треков={len(timecodes)}, тип={list_type}")
     return True
 
 
