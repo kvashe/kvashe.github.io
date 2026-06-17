@@ -633,6 +633,7 @@ const SYNONYMS = {
     "fleur": ["fleur", "flëur"],
     "nautiluspompilius": ["nautiluspompilius", "наутилуспомпилиус", "pompilius", "nautilus", "наутилус", "помпилиус"],
     "океанэлзи": ["океанэлзи", "элзи", "океанэльзы", "эльзы", "океанельзи", "ельзи"]
+    "iowa": ["iowa", "айова"]
 };
 
 const variantToCanon = new Map();
