@@ -29,6 +29,12 @@ FORCE_AUTHOR = None
 DEBUG = True
 SITE_URL = "https://kvashe.github.io"
 
+# ===== 1. Скомпилированная регулярка =====
+TIMECODE_RE = re.compile(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b')
+
+# ===== 2. Сессия requests =====
+SESSION = requests.Session()
+
 FORBIDDEN_PHRASES = [
     "хватит брать высокие ноты",
     "пой без кривляний",
@@ -111,7 +117,7 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
             params["pageToken"] = page_token
 
         try:
-            resp = requests.get("https://www.googleapis.com/youtube/v3/commentThreads", params=params)
+            resp = SESSION.get("https://www.googleapis.com/youtube/v3/commentThreads", params=params)
             if resp.status_code == 403:
                 logging.warning("Quota exceeded or access denied for video %s. Stopping comments fetch.", video_id)
                 break
@@ -153,17 +159,15 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
 
 # ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
 def clean_timecode_range(text):
-    time_pattern = r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b'
-    range_pattern = rf'({time_pattern})\s+[-–—]\s+{time_pattern}'
+    time_pattern = TIMECODE_RE  # используем скомпилированную регулярку
+    range_pattern = rf'({time_pattern.pattern})\s+[-–—]\s+{time_pattern.pattern}'
     return re.sub(range_pattern, r'\1', text)
 
 def count_timecodes(text):
-    time_pattern = r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b'
-    return sum(1 for line in text.split('\n') if re.search(time_pattern, line))
+    return sum(1 for line in text.split('\n') if TIMECODE_RE.search(line))
 
 def get_timecode_seconds(line):
-    time_pattern = r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b'
-    match = re.search(time_pattern, line)
+    match = TIMECODE_RE.search(line)
     if match:
         time_str = match.group(0)
         parts = [int(p) for p in time_str.split(':')]
@@ -187,8 +191,7 @@ def is_transcript_like(lines, min_gap):
     return (sum(deltas) / len(deltas)) < min_gap
 
 def is_good_timecode_line(line, min_words, max_words):
-    time_pattern = r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b'
-    match = re.search(time_pattern, line)
+    match = TIMECODE_RE.search(line)
     if not match:
         return False
     after_time = line[match.end():].strip()
@@ -245,7 +248,7 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
         all_lines = [
             line.strip()
             for line in text.split('\n')
-            if re.search(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b', line)
+            if TIMECODE_RE.search(line)
         ]
         if not all_lines:
             skipped_other += 1
@@ -318,14 +321,28 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
         best = max(candidates, key=lambda c: (c['music_score'], c['tc_count'], -_ts(c.get('published_at', ''))))
         if debug:
             logging.debug("Выбран лучший кандидат: %s (score=%d, tc=%d)", best['author'], best['music_score'], best['tc_count'])
+        
+        # ===== 5. Удаление дубликатов по таймкоду, а не по строке =====
+        dedup = {}
+        for line in best['valid_lines']:
+            sec = get_timecode_seconds(line)
+            if sec not in dedup:
+                dedup[sec] = line
+        sorted_lines = sorted(dedup.values(), key=get_timecode_seconds)
         return (
-            sorted(list(set(best['valid_lines'])), key=get_timecode_seconds),
+            sorted_lines,
             "tracklist",
             best['author']
         )
 
     if mixed_lines:
-        unique_lines = sorted(list(set(mixed_lines)), key=get_timecode_seconds)
+        # Здесь тоже можно применить дедупликацию по таймкоду
+        dedup_mixed = {}
+        for line in mixed_lines:
+            sec = get_timecode_seconds(line)
+            if sec not in dedup_mixed:
+                dedup_mixed[sec] = line
+        unique_lines = sorted(dedup_mixed.values(), key=get_timecode_seconds)
         authors_str = ", ".join(list(mixed_authors)[:3])
         if len(mixed_authors) > 3:
             authors_str += " и др."
@@ -364,17 +381,19 @@ def parse_single_video(video_entry, api_key, db, args):
         author = args.force_author
         logging.debug("Принудительно установлен автор: %s", author)
 
-    raw_date = "00000000"
-    try:
-        video_resp = requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"key": api_key, "part": "snippet", "id": video_id}
-        ).json()
-        if "items" in video_resp and video_resp["items"]:
-            published_at = video_resp["items"][0]["snippet"]["publishedAt"]
-            raw_date = published_at[:10].replace("-", "")
-    except Exception as e:
-        logging.warning("Не удалось получить дату для %s: %s", video_id, e)
+    # ===== 4. Дата из yt-dlp (с fallback на API) =====
+    raw_date = video_entry.get('raw_date', '00000000')
+    if raw_date == '00000000':
+        try:
+            video_resp = SESSION.get(
+                "https://www.googleapis.com/youtube/v3/videos",
+                params={"key": api_key, "part": "snippet", "id": video_id}
+            ).json()
+            if "items" in video_resp and video_resp["items"]:
+                published_at = video_resp["items"][0]["snippet"]["publishedAt"]
+                raw_date = published_at[:10].replace("-", "")
+        except Exception as e:
+            logging.warning("Не удалось получить дату через API для %s: %s", video_id, e)
 
     formatted_date = f"{raw_date[6:8]}.{raw_date[4:6]}.{raw_date[0:4]}" if len(raw_date) == 8 else "Неизвестно"
 
@@ -387,7 +406,11 @@ def parse_single_video(video_entry, api_key, db, args):
         "list_type": list_type,
         "author": author
     }
-    db[video_id] = video_data
+
+    # ===== 3. Блокировка при записи в БД =====
+    with db_lock:
+        db[video_id] = video_data
+
     logging.info("Сохранено: %s... (%s) автор=%s, треков=%d, тип=%s", title[:50], formatted_date, author, len(timecodes), list_type)
     return True
 
@@ -1021,25 +1044,55 @@ def run_parser():
                 return
 
             videos_to_parse = []
+            videos_to_fix_date = []  # видео с треклистом, но без даты
             for entry in channel_data['entries']:
                 if not entry:
                     continue
                 video_id = entry.get('id')
                 if not video_id:
                     continue
-                # Пропускаем видео, у которых уже есть полноценный треклист
+                # Если уже есть в БД и это полноценный треклист
                 if video_id in db and db[video_id].get('list_type') == 'tracklist':
+                    # Проверяем, есть ли реальная дата
+                    if db[video_id].get('raw_date', '00000000') == '00000000':
+                        # Дата отсутствует — нужно восстановить
+                        raw_date = entry.get('upload_date', '00000000')
+                        videos_to_fix_date.append((video_id, raw_date))
                     continue
+                # Остальные: новые или mixed/none — полный парсинг
+                raw_date = entry.get('upload_date', '00000000')
                 videos_to_parse.append({
                     'id': video_id,
-                    'title': entry.get('title', 'Без названия')
+                    'title': entry.get('title', 'Без названия'),
+                    'raw_date': raw_date
                 })
 
-            if not videos_to_parse:
-                logging.info("Нет видео для обработки.")
-                generate_html_report(db, args.site_url, args.output, args.tracklists)
-                return
+        # 1. Сначала исправляем даты у существующих треклистов (лёгкий процесс)
+        if videos_to_fix_date:
+            logging.info("Восстановление дат для %d существующих треклистов...", len(videos_to_fix_date))
+            for vid, raw_date in videos_to_fix_date:
+                if raw_date == '00000000':
+                    # Пытаемся получить через API
+                    try:
+                        video_resp = SESSION.get(
+                            "https://www.googleapis.com/youtube/v3/videos",
+                            params={"key": api_key, "part": "snippet", "id": vid}
+                        ).json()
+                        if "items" in video_resp and video_resp["items"]:
+                            published_at = video_resp["items"][0]["snippet"]["publishedAt"]
+                            raw_date = published_at[:10].replace("-", "")
+                    except Exception as e:
+                        logging.warning("Не удалось восстановить дату для %s: %s", vid, e)
+                if raw_date != '00000000':
+                    with db_lock:
+                        if vid in db:
+                            db[vid]['raw_date'] = raw_date
+                            db[vid]['date'] = f"{raw_date[6:8]}.{raw_date[4:6]}.{raw_date[0:4]}"
+                            logging.info("Дата обновлена для %s: %s", vid, db[vid]['date'])
+            save_database(db, args.db)
 
+        # 2. Полный парсинг новых/изменённых видео
+        if videos_to_parse:
             logging.info("Парсинг %d видео...", len(videos_to_parse))
 
             def worker(video):
@@ -1050,8 +1103,9 @@ def run_parser():
 
             save_database(db, args.db)
 
-            logging.info("Генерация отчётов...")
-            generate_html_report(db, args.site_url, args.output, args.tracklists)
+        # 3. Генерация отчётов (всегда)
+        logging.info("Генерация отчётов...")
+        generate_html_report(db, args.site_url, args.output, args.tracklists)
 
     except Exception as e:
         logging.exception("Критическая ошибка")
