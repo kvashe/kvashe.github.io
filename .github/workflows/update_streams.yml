@@ -2,7 +2,7 @@ name: Update Streams Database
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # каждый день в 00:00 (полночь)
+    - cron: '0 10 * * *'   # примерно 13:00 по Москве
   workflow_dispatch:          # возможность запуска вручную
 
 jobs:
