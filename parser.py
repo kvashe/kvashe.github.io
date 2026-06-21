@@ -158,11 +158,6 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
     return comments
 
 # ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
-def clean_timecode_range(text):
-    time_pattern = TIMECODE_RE  # используем скомпилированную регулярку
-    range_pattern = rf'({time_pattern.pattern})\s+[-–—]\s+{time_pattern.pattern}'
-    return re.sub(range_pattern, r'\1', text)
-
 def count_timecodes(text):
     return sum(1 for line in text.split('\n') if TIMECODE_RE.search(line))
 
@@ -255,8 +250,9 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
             continue
 
         comments_with_timecodes += 1
+        # НЕ применяем clean_timecode_range – строки с диапазоном "12:10 - 12:99 Название" идут как есть
         valid_lines = [
-            clean_timecode_range(line)
+            line
             for line in all_lines
             if is_good_timecode_line(line, min_words, max_words)
         ]
@@ -322,7 +318,7 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
         if debug:
             logging.debug("Выбран лучший кандидат: %s (score=%d, tc=%d)", best['author'], best['music_score'], best['tc_count'])
         
-        # ===== 5. Удаление дубликатов по таймкоду, а не по строке =====
+        # Дедупликация по таймкоду (берём первый таймкод строки)
         dedup = {}
         for line in best['valid_lines']:
             sec = get_timecode_seconds(line)
@@ -336,7 +332,7 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
         )
 
     if mixed_lines:
-        # Здесь тоже можно применить дедупликацию по таймкоду
+        # Дедупликация для смешанного списка
         dedup_mixed = {}
         for line in mixed_lines:
             sec = get_timecode_seconds(line)
@@ -381,7 +377,7 @@ def parse_single_video(video_entry, api_key, db, args):
         author = args.force_author
         logging.debug("Принудительно установлен автор: %s", author)
 
-    # ===== 4. Дата из yt-dlp (с fallback на API) =====
+    # Дата из yt-dlp (с fallback на API)
     raw_date = video_entry.get('raw_date', '00000000')
     if raw_date == '00000000':
         try:
@@ -407,7 +403,6 @@ def parse_single_video(video_entry, api_key, db, args):
         "author": author
     }
 
-    # ===== 3. Блокировка при записи в БД =====
     with db_lock:
         db[video_id] = video_data
 
@@ -471,7 +466,7 @@ def generate_html_report(db, site_url, output_html, tracklists_html):
         f.write('\n'.join(seo_lines))
     logging.info("SEO-страница создана: %s", os.path.abspath(tracklists_html))
 
-    # Основной HTML (шаблон вставлен полностью для сохранения работоспособности)
+    # Основной HTML с обновлённым JS (очистка диапазона на фронтенде)
     safe_site_url = html.escape(site_url)
     html_template = fr"""<!DOCTYPE html>
 <html lang="ru">
@@ -799,15 +794,19 @@ async function loadDatabase() {{
             const timecodes = entry.timecodes || [];
             const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
             const tracks = sorted.map(line => {{
-                const match = line.match(/(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)/);
+                // Удаляем диапазон таймкодов прямо здесь (frontend)
+                const cleanedLine = line.replace(
+                    /(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)\s*[-–—]\s*\d{{1,2}}:\d{{2}}(?::\d{{2}})?/,
+                    '$1'
+                );
+                const match = cleanedLine.match(/(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)/);
                 if (match) {{
-                    let s = line.replace(match[1], '').trim();
+                    let s = cleanedLine.replace(match[1], '').trim();
                     s = s.replace(/^[-–—]\s*/, '');
                     s = removeSpecificEmojis(s);
                     return {{ t: match[1], s: s }};
                 }} else {{
-                    let s = line;
-                    s = removeSpecificEmojis(s);
+                    let s = removeSpecificEmojis(cleanedLine);
                     return {{ s: s }};
                 }}
             }});
@@ -1044,22 +1043,18 @@ def run_parser():
                 return
 
             videos_to_parse = []
-            videos_to_fix_date = []  # видео с треклистом, но без даты
+            videos_to_fix_date = []
             for entry in channel_data['entries']:
                 if not entry:
                     continue
                 video_id = entry.get('id')
                 if not video_id:
                     continue
-                # Если уже есть в БД и это полноценный треклист
                 if video_id in db and db[video_id].get('list_type') == 'tracklist':
-                    # Проверяем, есть ли реальная дата
                     if db[video_id].get('raw_date', '00000000') == '00000000':
-                        # Дата отсутствует — нужно восстановить
                         raw_date = entry.get('upload_date', '00000000')
                         videos_to_fix_date.append((video_id, raw_date))
                     continue
-                # Остальные: новые или mixed/none — полный парсинг
                 raw_date = entry.get('upload_date', '00000000')
                 videos_to_parse.append({
                     'id': video_id,
@@ -1067,12 +1062,10 @@ def run_parser():
                     'raw_date': raw_date
                 })
 
-        # 1. Сначала исправляем даты у существующих треклистов (лёгкий процесс)
         if videos_to_fix_date:
             logging.info("Восстановление дат для %d существующих треклистов...", len(videos_to_fix_date))
             for vid, raw_date in videos_to_fix_date:
                 if raw_date == '00000000':
-                    # Пытаемся получить через API
                     try:
                         video_resp = SESSION.get(
                             "https://www.googleapis.com/youtube/v3/videos",
@@ -1091,7 +1084,6 @@ def run_parser():
                             logging.info("Дата обновлена для %s: %s", vid, db[vid]['date'])
             save_database(db, args.db)
 
-        # 2. Полный парсинг новых/изменённых видео
         if videos_to_parse:
             logging.info("Парсинг %d видео...", len(videos_to_parse))
 
@@ -1103,7 +1095,6 @@ def run_parser():
 
             save_database(db, args.db)
 
-        # 3. Генерация отчётов (всегда)
         logging.info("Генерация отчётов...")
         generate_html_report(db, args.site_url, args.output, args.tracklists)
 
