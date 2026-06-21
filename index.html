@@ -269,15 +269,19 @@ async function loadDatabase() {
             const timecodes = entry.timecodes || [];
             const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
             const tracks = sorted.map(line => {
-                const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+                // Удаляем диапазон таймкодов прямо здесь (frontend)
+                const cleanedLine = line.replace(
+                    /(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*\d{1,2}:\d{2}(?::\d{2})?/,
+                    '$1'
+                );
+                const match = cleanedLine.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
                 if (match) {
-                    let s = line.replace(match[1], '').trim();
+                    let s = cleanedLine.replace(match[1], '').trim();
                     s = s.replace(/^[-–—]\s*/, '');
                     s = removeSpecificEmojis(s);
                     return { t: match[1], s: s };
                 } else {
-                    let s = line;
-                    s = removeSpecificEmojis(s);
+                    let s = removeSpecificEmojis(cleanedLine);
                     return { s: s };
                 }
             });
