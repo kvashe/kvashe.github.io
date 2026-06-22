@@ -396,7 +396,7 @@ def generate_html_report(db, site_url, output_html, tracklists_html, player_html
         f.write('\n'.join(seo_lines))
     logging.info("SEO-страница создана: %s", os.path.abspath(tracklists_html))
 
-    # ---------- Страница плеера (стабильная версия без iOS-фиксов) ----------
+    # ---------- Страница плеера (с авто‑пропуском рекламы) ----------
     player_html = r'''<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -700,6 +700,22 @@ def generate_html_report(db, site_url, output_html, tracklists_html, player_html
     const trackIntegrity = document.getElementById('track-integrity');
     const shuffleBtn = document.getElementById('shuffle');
     const volumeSlider = document.getElementById('volume-slider');
+
+    // ----- Автопропуск рекламы -----
+    function trySkipAd() {
+        if (!player || !playerReady) return;
+        try {
+            // Метод skipVideoAd существует, если реклама пропускаема
+            if (typeof player.skipVideoAd === 'function') {
+                player.skipVideoAd();
+            }
+        } catch (e) {
+            // не беда, если нет рекламы или она не пропускается
+        }
+    }
+
+    // Проверяем возможность пропуска раз в секунду
+    setInterval(trySkipAd, 1000);
 
     function applyVolumeToPlayer() {
         if (player && playerReady) {
