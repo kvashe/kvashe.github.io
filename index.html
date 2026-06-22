@@ -91,8 +91,19 @@
         .gray { color: var(--text-muted); font-size: 14px; font-style: italic; }
         .no-tcs-box { padding: 4px 0; }
         .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
+        .player-link {
+            margin-left: 20px;
+            font-size: 16px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+        .player-link:hover {
+            color: #a5b4fc;
+        }
         @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
-    </style></head><body><!-- Скрытая ссылка для поисковиков на полный список треклистов --><a href="tracklists.html" style="display:none;" aria-hidden="true">Полный список треков (SEO)</a><div class="parallax-notes" id="parallaxNotes"></div><div class="header-panel"><div class="container header-flex"><h2>Архив трансляций <span>Квашеной</span></h2><div class="search-box"><form class="input-wrapper" onsubmit="event.preventDefault();"><input type="text" id="sInput" class="s-input" placeholder="Поиск песни"><button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button></form><div id="searchStats">Найдено трансляций: 0</div></div></div></div><div class="container"><div id="yearFilters" class="year-filters"></div><div class="grid" id="mainGrid"><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div></div></div><button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button><script>
+    </style></head><body><a href="tracklists.html" style="display:none;" aria-hidden="true">Полный список треков (SEO)</a><div class="parallax-notes" id="parallaxNotes"></div><div class="header-panel"><div class="container header-flex"><h2>Архив трансляций <span>Квашеной</span><a href="player.html" class="player-link">🎵 Плеер</a></h2><div class="search-box"><form class="input-wrapper" onsubmit="event.preventDefault();"><input type="text" id="sInput" class="s-input" placeholder="Поиск песни"><button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button></form><div id="searchStats">Найдено трансляций: 0</div></div></div></div><div class="container"><div id="yearFilters" class="year-filters"></div><div class="grid" id="mainGrid"><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div><div class="skeleton-row shimmer"><div class="skeleton-img shimmer"></div><div class="skeleton-content"><div class="skeleton-title shimmer"></div><div class="skeleton-details shimmer"></div></div></div></div></div><button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button><script>
 (function() {
     const notesContainer = document.getElementById('parallaxNotes');
     if (!notesContainer) return;
@@ -142,7 +153,6 @@
     window.addEventListener('resize', () => updateNotesPosition());
     updateNotesPosition();
 })();
-// ========== БЕЗОПАСНОЕ УДАЛЕНИЕ ТОЛЬКО ЭМОДЗИ ==========
 function removeSpecificEmojis(str) {
     if (typeof Intl !== 'undefined' && Intl.Segmenter) {
         const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
@@ -160,7 +170,6 @@ function removeSpecificEmojis(str) {
         return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu, '');
     }
 }
-// ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
 function normalize(str) {
     return str.toLowerCase()
               .replace(/ë/g, 'e')
@@ -269,7 +278,6 @@ async function loadDatabase() {
             const timecodes = entry.timecodes || [];
             const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
             const tracks = sorted.map(line => {
-                // Удаляем диапазон таймкодов прямо здесь (frontend)
                 const cleanedLine = line.replace(
                     /(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*\d{1,2}:\d{2}(?::\d{2})?/,
                     '$1'

@@ -2,7 +2,6 @@ import os
 import re
 import json
 import threading
-import textwrap
 import requests
 import sys
 import datetime
@@ -19,6 +18,7 @@ CHANNEL_STREAMS_URL = 'https://www.youtube.com/@kvashenaya/streams'
 DB_FILE = "parsed_streams_db.json"
 OUTPUT_HTML = "index.html"
 TRACKLISTS_HTML = "tracklists.html"
+PLAYER_HTML = "player.html"
 NEW_STREAMS_TO_CHECK = 999
 MAX_WORKERS = 4
 MIN_TIMECODES_COUNT = 5
@@ -49,23 +49,24 @@ def setup_logging(debug):
 # ==================== АРГУМЕНТЫ КОМАНДНОЙ СТРОКИ ====================
 def parse_args():
     parser = argparse.ArgumentParser(description="Парсер треклистов YouTube-трансляций")
-    parser.add_argument('--api-key', default=API_KEY, help='YouTube Data API key (по умолчанию из YOUTUBE_API_KEY)')
+    parser.add_argument('--api-key', default=API_KEY, help='YouTube Data API key')
     parser.add_argument('--channel', default=CHANNEL_STREAMS_URL, help='URL плейлиста трансляций')
     parser.add_argument('--db', default=DB_FILE, help='Файл базы данных')
     parser.add_argument('--output', default=OUTPUT_HTML, help='Выходной HTML-файл')
     parser.add_argument('--tracklists', default=TRACKLISTS_HTML, help='SEO-страница треклистов')
+    parser.add_argument('--player', default=PLAYER_HTML, help='Страница плеера')
     parser.add_argument('--site-url', default=SITE_URL, help='URL сайта для sitemap')
-    parser.add_argument('--max-workers', type=int, default=MAX_WORKERS, help='Число потоков')
-    parser.add_argument('--new-streams', type=int, default=NEW_STREAMS_TO_CHECK, help='Количество новых стримов для проверки (0 = все)')
-    parser.add_argument('--min-timecodes', type=int, default=MIN_TIMECODES_COUNT, help='Мин. число таймкодов для треклиста')
-    parser.add_argument('--min-words', type=int, default=MIN_WORDS_AFTER_TIMECODE, help='Мин. слов после таймкода')
-    parser.add_argument('--max-words', type=int, default=MAX_WORDS_AFTER_TIMECODE, help='Макс. слов после таймкода')
-    parser.add_argument('--min-gap', type=int, default=MIN_AVG_TIMECODE_GAP, help='Мин. средний промежуток между таймкодами (сек)')
-    parser.add_argument('--force-author', default=FORCE_AUTHOR, help='Принудительно указать автора треклиста')
-    parser.add_argument('--debug', action='store_const', const=True, default=None, help='Включить подробный вывод (если не указан, используется глобальный DEBUG)')
+    parser.add_argument('--max-workers', type=int, default=MAX_WORKERS)
+    parser.add_argument('--new-streams', type=int, default=NEW_STREAMS_TO_CHECK)
+    parser.add_argument('--min-timecodes', type=int, default=MIN_TIMECODES_COUNT)
+    parser.add_argument('--min-words', type=int, default=MIN_WORDS_AFTER_TIMECODE)
+    parser.add_argument('--max-words', type=int, default=MAX_WORDS_AFTER_TIMECODE)
+    parser.add_argument('--min-gap', type=int, default=MIN_AVG_TIMECODE_GAP)
+    parser.add_argument('--force-author', default=FORCE_AUTHOR)
+    parser.add_argument('--debug', action='store_const', const=True, default=None)
     return parser.parse_args()
 
-# ==================== РАБОТА С БАЗОЙ (in-memory + atomic write) ====================
+# ==================== РАБОТА С БАЗОЙ ====================
 db_lock = threading.Lock()
 
 def load_database(db_file):
@@ -85,7 +86,6 @@ def load_database(db_file):
         return {}
 
 def save_database(db, db_file):
-    """Атомарно сохраняет базу (dict video_id -> данные) в JSON файл."""
     with db_lock:
         sorted_items = sorted(db.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
         tmp_file = db_file + ".tmp"
@@ -98,7 +98,7 @@ def save_database(db, db_file):
             if os.path.exists(tmp_file):
                 os.unlink(tmp_file)
 
-# ==================== API YOUTUBE С ОБРАБОТКОЙ ОШИБОК ====================
+# ==================== API YOUTUBE ====================
 def get_video_comments_via_api(video_id, api_key, max_comments=3000):
     comments = []
     page_token = None
@@ -119,16 +119,13 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
         try:
             resp = SESSION.get("https://www.googleapis.com/youtube/v3/commentThreads", params=params)
             if resp.status_code == 403:
-                logging.warning("Quota exceeded or access denied for video %s. Stopping comments fetch.", video_id)
+                logging.warning("Quota exceeded for %s", video_id)
                 break
             if resp.status_code == 429:
                 retries += 1
                 if retries > max_retries:
-                    logging.error("Too many requests. Giving up on %s.", video_id)
                     break
-                sleep_time = 2 ** retries
-                logging.info("Rate limited. Sleeping %d seconds...", sleep_time)
-                time.sleep(sleep_time)
+                time.sleep(2 ** retries)
                 continue
             resp.raise_for_status()
             data = resp.json()
@@ -137,7 +134,6 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
             break
 
         if "error" in data:
-            logging.error("API error: %s", data["error"].get("message", "Unknown error"))
             break
 
         for item in data.get("items", []):
@@ -148,19 +144,30 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
                 "is_pinned": False,
                 "published_at": snippet.get("publishedAt", "")
             })
-            if len(comments) >= max_comments:
-                break
-
         page_token = data.get("nextPageToken")
         if not page_token:
             break
-
     return comments
 
-# ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
-def count_timecodes(text):
-    return sum(1 for line in text.split('\n') if TIMECODE_RE.search(line))
+def get_video_duration(video_id, api_key):
+    try:
+        resp = SESSION.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params={"key": api_key, "part": "contentDetails", "id": video_id}
+        ).json()
+        if "items" in resp and resp["items"]:
+            duration_iso = resp["items"][0]["contentDetails"]["duration"]
+            match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_iso)
+            if match:
+                h = int(match.group(1) or 0)
+                m = int(match.group(2) or 0)
+                s = int(match.group(3) or 0)
+                return h*3600 + m*60 + s
+    except Exception as e:
+        logging.warning("Не удалось получить длительность для %s: %s", video_id, e)
+    return 0
 
+# ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
 def get_timecode_seconds(line):
     match = TIMECODE_RE.search(line)
     if match:
@@ -172,12 +179,25 @@ def get_timecode_seconds(line):
             return parts[0] * 3600 + parts[1] * 60 + parts[2]
     return 99999999
 
+def parse_timecode_range(line):
+    matches = list(TIMECODE_RE.finditer(line))
+    if not matches:
+        return None, None, line.strip()
+    start_match = matches[0]
+    start_sec = get_timecode_seconds(line[start_match.start():start_match.end()])
+    if len(matches) >= 2:
+        between = line[start_match.end():matches[1].start()]
+        if re.search(r'[-–—]', between):
+            end_sec = get_timecode_seconds(line[matches[1].start():matches[1].end()])
+            title = line[:start_match.start()] + line[matches[1].end():]
+            title = re.sub(r'^\s*[-–—]\s*', '', title).strip()
+            return start_sec, end_sec, title
+    title = line[:start_match.start()] + line[start_match.end():]
+    title = title.strip()
+    return start_sec, None, title
+
 def is_transcript_like(lines, min_gap):
-    times = []
-    for line in lines:
-        sec = get_timecode_seconds(line)
-        if sec != 99999999:
-            times.append(sec)
+    times = [get_timecode_seconds(l) for l in lines if get_timecode_seconds(l) != 99999999]
     if len(times) < 5:
         return False
     deltas = [times[i+1] - times[i] for i in range(len(times)-1) if times[i+1] > times[i]]
@@ -195,10 +215,7 @@ def is_good_timecode_line(line, min_words, max_words):
     clean_after = re.sub(r'[^\w\sа-яА-ЯёЁA-Za-z]', ' ', after_time)
     words = clean_after.split()
     word_count = len(words)
-    if ' - ' in after_time:
-        effective_max = 50
-    else:
-        effective_max = max_words
+    effective_max = 50 if ' - ' in after_time else max_words
     special_allowed = ["титры", "интро", "начало", "конец", "финал",
                        "донаты", "розыгрыш", "чат", "сигн",
                        "вступление", "intro", "outro", "припев", "куплет"]
@@ -218,72 +235,35 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
     mixed_lines = []
     mixed_authors = set()
 
-    total_comments = len(comments) if comments else 0
-    comments_with_timecodes = 0
-    skipped_forbidden = 0
-    skipped_low_tc = 0
-    skipped_transcript = 0
-    skipped_other = 0
-
-    if debug:
-        logging.debug("Всего комментариев для анализа: %d", total_comments)
-        if comments:
-            for idx, c in enumerate(comments[:3]):
-                logging.debug("Комм. %d: автор='%s', текст='%s...'", idx+1, c.get('author','?'), c.get('text','')[:80])
-
     for comment in comments:
         text = comment.get('text', '')
         text_lower = text.lower()
         if any(phrase.lower() in text_lower for phrase in FORBIDDEN_PHRASES):
-            if debug:
-                logging.debug("Пропущен (запрещ. фраза) автор: %s", comment.get('author','?'))
-            skipped_forbidden += 1
             continue
 
-        all_lines = [
-            line.strip()
-            for line in text.split('\n')
-            if TIMECODE_RE.search(line)
-        ]
+        all_lines = [line.strip() for line in text.split('\n') if TIMECODE_RE.search(line)]
         if not all_lines:
-            skipped_other += 1
             continue
 
-        comments_with_timecodes += 1
-        # НЕ применяем clean_timecode_range – строки с диапазоном "12:10 - 12:99 Название" идут как есть
-        valid_lines = [
-            line
-            for line in all_lines
-            if is_good_timecode_line(line, min_words, max_words)
-        ]
+        valid_lines = [line for line in all_lines if is_good_timecode_line(line, min_words, max_words)]
         tc_count = len(valid_lines)
 
         if tc_count >= min_timecodes:
             if is_transcript_like(valid_lines, min_gap):
-                if debug:
-                    logging.debug("Пропущен (похож на транскрипт) автор: %s", comment.get('author','?'))
-                skipped_transcript += 1
                 continue
 
             music_score = 0
             for line in valid_lines:
-                if ' - ' in line:
-                    music_score += 3
-                if re.search(r'[A-Za-z]', line):
-                    music_score += 1
-                if '(' in line or ')' in line:
-                    music_score += 1
+                if ' - ' in line: music_score += 3
+                if re.search(r'[A-Za-z]', line): music_score += 1
+                if '(' in line or ')' in line: music_score += 1
                 bad_words = ['стрим', 'волос', 'сигна', 'говорит', 'чат', 'вопрос',
                              'talking', 'спросить', 'умница', 'красив']
-                lower = line.lower()
-                if any(w in lower for w in bad_words):
-                    music_score -= 2
+                if any(w in line.lower() for w in bad_words): music_score -= 2
 
             author = comment.get('author', 'Неизвестно')
             if author in ("@ajoajo701", "@mirovoy100"):
                 music_score = -1_000_000
-                if debug:
-                    logging.debug("Автор %s получает штраф -1 000 000 баллов", author)
 
             candidates.append({
                 'text': text,
@@ -294,45 +274,25 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
                 'published_at': comment.get('published_at', '')
             })
         else:
-            skipped_low_tc += 1
             mixed_lines.extend(valid_lines)
             mixed_authors.add(comment.get('author', 'Неизвестно'))
-
-    if debug:
-        logging.debug("Статистика комментариев: всего=%d, с таймкодами=%d, запрещ=%d, мало=%d, транскрипт=%d, кандидатов=%d",
-                     total_comments, comments_with_timecodes, skipped_forbidden, skipped_low_tc, skipped_transcript, len(candidates))
-        if candidates:
-            logging.debug("Таблица кандидатов:")
-            for c in candidates:
-                logging.debug("%-20s tc=%-5d score=%-8d date=%s", c['author'], c['tc_count'], c['music_score'], c['published_at'])
 
     if candidates:
         def _ts(date_str):
             try:
-                dt = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                return dt.timestamp()
-            except Exception:
+                return datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00')).timestamp()
+            except:
                 return 9999999999
-
         best = max(candidates, key=lambda c: (c['music_score'], c['tc_count'], -_ts(c.get('published_at', ''))))
-        if debug:
-            logging.debug("Выбран лучший кандидат: %s (score=%d, tc=%d)", best['author'], best['music_score'], best['tc_count'])
-        
-        # Дедупликация по таймкоду (берём первый таймкод строки)
         dedup = {}
         for line in best['valid_lines']:
             sec = get_timecode_seconds(line)
             if sec not in dedup:
                 dedup[sec] = line
         sorted_lines = sorted(dedup.values(), key=get_timecode_seconds)
-        return (
-            sorted_lines,
-            "tracklist",
-            best['author']
-        )
+        return sorted_lines, "tracklist", best['author']
 
     if mixed_lines:
-        # Дедупликация для смешанного списка
         dedup_mixed = {}
         for line in mixed_lines:
             sec = get_timecode_seconds(line)
@@ -342,12 +302,8 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
         authors_str = ", ".join(list(mixed_authors)[:3])
         if len(mixed_authors) > 3:
             authors_str += " и др."
-        if debug:
-            logging.debug("Смешанный режим, авторы фрагментов: %s, строк: %d", authors_str, len(unique_lines))
         return unique_lines, "mixed", authors_str
 
-    if debug:
-        logging.debug("Треклист не найден")
     return [], "none", ""
 
 # ==================== ПАРСИНГ ОДНОГО ВИДЕО ====================
@@ -357,27 +313,13 @@ def parse_single_video(video_entry, api_key, db, args):
     logging.info("Парсинг: %s...", title[:60])
 
     comments = get_video_comments_via_api(video_id, api_key)
-
-    if args.debug:
-        if comments:
-            logging.debug("Получено комментариев: %d. Первый: %s...", len(comments), comments[0].get('text','')[:120])
-        else:
-            logging.debug("Комментариев не найдено (возможно, отключены)")
-
     timecodes, list_type, author = extract_smart_timecodes(
-        comments,
-        min_timecodes=args.min_timecodes,
-        min_words=args.min_words,
-        max_words=args.max_words,
-        min_gap=args.min_gap,
-        debug=args.debug
+        comments, args.min_timecodes, args.min_words, args.max_words, args.min_gap, args.debug
     )
 
     if args.force_author:
         author = args.force_author
-        logging.debug("Принудительно установлен автор: %s", author)
 
-    # Дата из yt-dlp (с fallback на API)
     raw_date = video_entry.get('raw_date', '00000000')
     if raw_date == '00000000':
         try:
@@ -389,7 +331,9 @@ def parse_single_video(video_entry, api_key, db, args):
                 published_at = video_resp["items"][0]["snippet"]["publishedAt"]
                 raw_date = published_at[:10].replace("-", "")
         except Exception as e:
-            logging.warning("Не удалось получить дату через API для %s: %s", video_id, e)
+            logging.warning("Не удалось получить дату для %s: %s", video_id, e)
+
+    duration = get_video_duration(video_id, api_key)
 
     formatted_date = f"{raw_date[6:8]}.{raw_date[4:6]}.{raw_date[0:4]}" if len(raw_date) == 8 else "Неизвестно"
 
@@ -400,13 +344,14 @@ def parse_single_video(video_entry, api_key, db, args):
         "raw_date": raw_date,
         "timecodes": timecodes,
         "list_type": list_type,
-        "author": author
+        "author": author,
+        "duration": duration
     }
-
     with db_lock:
         db[video_id] = video_data
-
-    logging.info("Сохранено: %s... (%s) автор=%s, треков=%d, тип=%s", title[:50], formatted_date, author, len(timecodes), list_type)
+    logging.info("Сохранено: %s... (%s) автор=%s, треков=%d, длит=%s",
+                 title[:50], formatted_date, author, len(timecodes),
+                 str(datetime.timedelta(seconds=duration)) if duration else "неизв")
     return True
 
 # ==================== ГЕНЕРАЦИЯ СТРАНИЦ ====================
@@ -414,59 +359,615 @@ def generate_sitemap(site_url):
     pages = [
         {"loc": f"{site_url}/index.html", "priority": "1.0"},
         {"loc": f"{site_url}/tracklists.html", "priority": "0.8"},
+        {"loc": f"{site_url}/player.html", "priority": "0.7"},
     ]
-    xml_lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for p in pages:
-        xml_lines.append("  <url>")
-        xml_lines.append(f"    <loc>{p['loc']}</loc>")
-        xml_lines.append(f"    <priority>{p['priority']}</priority>")
-        xml_lines.append("  </url>")
-    xml_lines.append("</urlset>")
-
+        xml.append(f"  <url><loc>{p['loc']}</loc><priority>{p['priority']}</priority></url>")
+    xml.append("</urlset>")
     with open("sitemap.xml", "w", encoding="utf-8") as f:
-        f.write("\n".join(xml_lines))
+        f.write("\n".join(xml))
     logging.info("Sitemap создан: %s", os.path.abspath("sitemap.xml"))
 
-def generate_html_report(db, site_url, output_html, tracklists_html):
-    logging.info("Генерация HTML-отчётов...")
+def generate_html_report(db, site_url, output_html, tracklists_html, player_html_path):
+    logging.info("Генерация HTML-отчётов и плеера...")
 
+    # ---------- SEO-страница ----------
     streams_for_seo = [
         item for item in db.values()
         if item.get('list_type') in ('tracklist', 'mixed') and item.get('timecodes')
     ]
     streams_for_seo.sort(key=lambda x: x.get("raw_date", "00000000"), reverse=True)
-
-    # SEO-страница со списком треков
     seo_lines = [
-        '<!DOCTYPE html>',
-        '<html lang="ru">',
-        '<head>',
-        '<meta charset="UTF-8">',
-        '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-        '<title>Архив треклистов Квашеной – все треклисты</title>',
-        '<meta name="description" content="Полный список всех треков с трансляций Квашеной. Таймкоды и названия песен.">',
-        '<meta name="robots" content="index, follow">',
-        '</head>',
-        '<body>',
+        '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">',
+        '<title>Архив треклистов Квашеной – все треклисты</title></head><body>',
         '<h1>Все треклисты трансляций Квашеной</h1>'
     ]
     for stream in streams_for_seo:
         title = html.escape(stream.get('title', 'Без названия'))
         date = html.escape(stream.get('date', ''))
-        seo_lines.append(f'<h2>{title} ({date})</h2>')
-        seo_lines.append('<ul>')
+        seo_lines.append(f'<h2>{title} ({date})</h2><ul>')
         for line in stream.get('timecodes', []):
-            safe_line = html.escape(line)
-            seo_lines.append(f'<li>{safe_line}</li>')
+            seo_lines.append(f'<li>{html.escape(line)}</li>')
         seo_lines.append('</ul>')
     seo_lines.append('</body></html>')
-
     with open(tracklists_html, 'w', encoding='utf-8') as f:
         f.write('\n'.join(seo_lines))
     logging.info("SEO-страница создана: %s", os.path.abspath(tracklists_html))
 
-    # Основной HTML с обновлённым JS (очистка диапазона на фронтенде)
+    # ---------- Страница плеера (стабильная версия без iOS-фиксов) ----------
+    player_html = r'''<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Плеер треклистов Квашеной</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.8);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+        body {
+            margin: 0; padding: 20px;
+            background: #0b1020;
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+            background-image: radial-gradient(at 80% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                              radial-gradient(at 20% 80%, rgba(244, 63, 94, 0.1) 0px, transparent 50%);
+        }
+        .container {
+            max-width: 500px; width: 100%;
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .track-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .thumbnail {
+            width: 120px; height: 68px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+            background: #1e293b;
+            position: relative;
+        }
+        .thumbnail img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: none;
+            transition: opacity 0.3s;
+        }
+        .thumbnail:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 12px rgba(99,102,241,0.4);
+        }
+        .shimmer-thumb::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0) 60%);
+            animation: shimmerMove 1.2s infinite linear;
+            pointer-events: none;
+        }
+        @keyframes shimmerMove {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .track-details {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .marquee {
+            overflow: hidden;
+            white-space: nowrap;
+            position: relative;
+        }
+        .marquee span {
+            display: inline-block;
+            padding-left: 0;
+            animation: none;
+        }
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        .track-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 4px;
+        }
+        .track-stream {
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+        .track-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .track-integrity {
+            font-size: 1.1em;
+            cursor: default;
+        }
+        .track-author {
+            font-style: italic;
+        }
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 4px;
+        }
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: var(--text-muted);
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            align-items: center;
+        }
+        button {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text-main);
+            font-size: 1.5em;
+            padding: 10px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+            width: 52px;
+            height: 52px;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.18);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .shuffle-btn {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.12);
+            color: var(--text-main);
+        }
+        .shuffle-btn.shuffled {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+            padding: 0 8px;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 6px rgba(99,102,241,0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        .playlist-link {
+            text-align: center;
+            margin-top: 8px;
+        }
+        .playlist-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        #player {
+            width: 0; height: 0; visibility: hidden;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="track-info">
+        <a class="thumbnail shimmer-thumb" id="track-link" target="_blank">
+            <img id="track-thumb" src="" alt="" onload="this.style.display='block'; this.parentElement.classList.remove('shimmer-thumb')" onerror="this.parentElement.classList.remove('shimmer-thumb')">
+        </a>
+        <div class="track-details">
+            <div class="track-title marquee" id="track-title"><span>--</span></div>
+            <div class="track-stream marquee" id="track-stream"><span></span></div>
+        </div>
+    </div>
+    <div class="track-meta">
+        <span class="track-integrity" id="track-integrity" title="">✅</span>
+        <span class="track-author" id="track-author"></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="time-info">
+        <span id="time-current">0:00</span>
+        <span id="time-duration">?:??</span>
+    </div>
+    <div class="controls">
+        <button id="prev" title="Назад">⏮️</button>
+        <button id="play-pause" title="Play/Pause">▶️</button>
+        <button id="next" title="Вперёд">⏭️</button>
+        <button id="shuffle" class="shuffle-btn" title="Перемешать">🔀</button>
+    </div>
+    <div class="volume-container">
+        <span style="font-size:1.5em;">🔊</span>
+        <input type="range" id="volume-slider" min="0" max="100" value="100" title="Громкость">
+    </div>
+    <div class="playlist-link">
+        <a href="index.html">← К архиву треклистов</a>
+    </div>
+</div>
+<div id="player"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    function parseTimecodeRange(line) {
+        const re = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
+        const matches = [...line.matchAll(re)];
+        if (matches.length === 0) return { start: null, end: null, title: line.trim() };
+        const startStr = matches[0][1];
+        const startSec = getSeconds(startStr);
+        if (matches.length >= 2) {
+            const between = line.substring(matches[0].index + matches[0][1].length, matches[1].index);
+            if (/[-–—]/.test(between)) {
+                const endSec = getSeconds(matches[1][1]);
+                const title = (line.substring(0, matches[0].index) + line.substring(matches[1].index + matches[1][1].length)).trim();
+                return { start: startSec, end: endSec, title: title.replace(/^[-–—]\s*/, '') };
+            }
+        }
+        const title = (line.substring(0, matches[0].index) + line.substring(matches[0].index + matches[0][1].length)).trim();
+        return { start: startSec, end: null, title: title };
+    }
+
+    function getSeconds(tc) {
+        const parts = tc.split(':').map(Number);
+        if (parts.length === 2) return parts[0]*60 + parts[1];
+        if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+        return 0;
+    }
+
+    let originalTracks = [];
+    let tracks = [];
+    let isShuffled = false;
+    let currentIndex = 0;
+    let player = null;
+    let playerReady = false;
+    let isPlaying = false;
+    let checkInterval = null;
+    let currentTrack = null;
+    let videoDuration = 0;
+    let volume = 100;
+
+    const progressBar = document.getElementById('progress-bar');
+    const timeCurrent = document.getElementById('time-current');
+    const timeDuration = document.getElementById('time-duration');
+    const trackAuthor = document.getElementById('track-author');
+    const trackIntegrity = document.getElementById('track-integrity');
+    const shuffleBtn = document.getElementById('shuffle');
+    const volumeSlider = document.getElementById('volume-slider');
+
+    function applyVolumeToPlayer() {
+        if (player && playerReady) {
+            player.setVolume(volume);
+            if (volume == 0) {
+                player.mute();
+            } else {
+                player.unMute();
+            }
+        }
+    }
+
+    volumeSlider.addEventListener('input', function() {
+        volume = parseInt(this.value);
+        applyVolumeToPlayer();
+    });
+
+    function setupMarquee(el, text) {
+        el.innerHTML = `<span>${text}</span>`;
+        const span = el.querySelector('span');
+        requestAnimationFrame(() => {
+            if (span.scrollWidth <= el.clientWidth) {
+                span.style.animation = 'none';
+                span.style.paddingLeft = '0';
+            } else {
+                span.style.animation = 'marquee 8s linear infinite';
+                span.style.paddingLeft = '100%';
+            }
+        });
+    }
+
+    function formatTime(seconds) {
+        if (isNaN(seconds) || seconds < 0) seconds = 0;
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        if (h > 0) {
+            return h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        } else {
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+    }
+
+    async function init() {
+        try {
+            const resp = await fetch('parsed_streams_db.json');
+            const db = await resp.json();
+            const items = Array.isArray(db) ? db : Object.values(db);
+            tracks = [];
+            for (const item of items) {
+                if (!item.timecodes || (item.list_type !== 'tracklist' && item.list_type !== 'mixed')) continue;
+                for (const line of item.timecodes) {
+                    const parsed = parseTimecodeRange(line);
+                    if (parsed.start == null) continue;
+                    const hasEnd = parsed.end !== null;
+                    const end = parsed.end ?? parsed.start + 240;
+                    tracks.push({
+                        videoId: item.id,
+                        start: parsed.start,
+                        end: end,
+                        title: parsed.title,
+                        streamTitle: item.title || 'Без названия',
+                        streamDate: item.date || '',
+                        streamAuthor: item.author || '',
+                        thumbnail: `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`,
+                        url: `https://www.youtube.com/watch?v=${item.id}&t=${parsed.start}s`,
+                        videoDuration: item.duration || 0,
+                        hasEnd: hasEnd
+                    });
+                }
+            }
+            originalTracks = [...tracks];
+            updateShuffleButton();
+            if (tracks.length > 0) {
+                if (playerReady) {
+                    playTrack(0);
+                } else {
+                    window._playOnReady = () => playTrack(0);
+                }
+            }
+        } catch(e) {
+            console.error('Failed to load database:', e);
+            document.getElementById('track-title').textContent = 'Ошибка загрузки базы';
+        }
+    }
+
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            height: '0',
+            width: '0',
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
+
+    function onPlayerReady(event) {
+        playerReady = true;
+        applyVolumeToPlayer();
+        if (window._playOnReady) {
+            window._playOnReady();
+            window._playOnReady = null;
+        } else if (tracks.length > 0 && !currentTrack) {
+            playTrack(0);
+        }
+    }
+
+    function playTrack(index) {
+        if (!tracks.length || !player || !playerReady) return;
+        currentIndex = index;
+        currentTrack = tracks[currentIndex];
+        setupMarquee(document.getElementById('track-title'), currentTrack.title);
+        setupMarquee(document.getElementById('track-stream'), currentTrack.streamTitle + ' (' + currentTrack.streamDate + ')');
+        
+        if (currentTrack.hasEnd) {
+            trackIntegrity.textContent = '✅';
+            trackIntegrity.title = 'Треклист имеет начало и конец песни';
+        } else {
+            trackIntegrity.textContent = '⚠️';
+            trackIntegrity.title = 'Треклист не имеет окончания песни';
+        }
+        trackAuthor.textContent = currentTrack.streamAuthor ? 'Автор треклиста: ' + currentTrack.streamAuthor : '';
+        
+        const thumbLink = document.getElementById('track-link');
+        const thumbImg = document.getElementById('track-thumb');
+        thumbLink.classList.add('shimmer-thumb');
+        thumbImg.style.display = 'none';
+        thumbImg.src = currentTrack.thumbnail;
+        thumbLink.href = currentTrack.url;
+
+        videoDuration = currentTrack.videoDuration || 0;
+        updateDurationDisplay();
+
+        player.loadVideoById({
+            videoId: currentTrack.videoId,
+            startSeconds: currentTrack.start
+        });
+    }
+
+    function updateDurationDisplay() {
+        if (videoDuration > 0) {
+            timeDuration.textContent = formatTime(videoDuration);
+        } else {
+            timeDuration.textContent = '?:??';
+        }
+    }
+
+    function startTimeCheck() {
+        if (checkInterval) clearInterval(checkInterval);
+        checkInterval = setInterval(() => {
+            if (!player || !player.getCurrentTime || !currentTrack) return;
+
+            if (!videoDuration || videoDuration <= 0) {
+                const dur = player.getDuration();
+                if (dur && dur > 0) {
+                    videoDuration = dur;
+                    updateDurationDisplay();
+                }
+            }
+
+            const currentTime = player.getCurrentTime();
+            const track = tracks[currentIndex];
+
+            if (videoDuration > 0) {
+                const progress = (currentTime / videoDuration) * 100;
+                progressBar.style.width = Math.min(100, Math.max(0, progress)) + '%';
+            } else {
+                progressBar.style.width = '0%';
+            }
+
+            timeCurrent.textContent = formatTime(currentTime);
+
+            if (currentTime >= track.end) {
+                nextTrack();
+            }
+        }, 300);
+    }
+
+    function onPlayerStateChange(event) {
+        if (event.data === YT.PlayerState.ENDED) {
+            nextTrack();
+        } else if (event.data === YT.PlayerState.PLAYING) {
+            isPlaying = true;
+            document.getElementById('play-pause').textContent = '⏸️';
+            startTimeCheck();
+        } else if (event.data === YT.PlayerState.PAUSED) {
+            isPlaying = false;
+            document.getElementById('play-pause').textContent = '▶️';
+            if (checkInterval) clearInterval(checkInterval);
+        }
+    }
+
+    function togglePlayPause() {
+        if (!player || !playerReady) return;
+        if (isPlaying) {
+            player.pauseVideo();
+        } else {
+            player.playVideo();
+        }
+    }
+
+    function nextTrack() {
+        if (!tracks.length) return;
+        currentIndex = (currentIndex + 1) % tracks.length;
+        playTrack(currentIndex);
+    }
+
+    function prevTrack() {
+        if (!tracks.length) return;
+        currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
+        playTrack(currentIndex);
+    }
+
+    function shuffleTracks() {
+        if (!originalTracks.length) return;
+        if (isShuffled) {
+            const currentTrackId = tracks[currentIndex]?.videoId + '_' + tracks[currentIndex]?.start;
+            tracks = [...originalTracks];
+            const newIndex = tracks.findIndex(t => (t.videoId + '_' + t.start) === currentTrackId);
+            currentIndex = newIndex !== -1 ? newIndex : 0;
+            isShuffled = false;
+            playTrack(currentIndex);
+        } else {
+            const currentTrackId = tracks[currentIndex]?.videoId + '_' + tracks[currentIndex]?.start;
+            for (let i = tracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+            }
+            const newIndex = tracks.findIndex(t => (t.videoId + '_' + t.start) === currentTrackId);
+            currentIndex = newIndex !== -1 ? newIndex : 0;
+            isShuffled = true;
+            playTrack(currentIndex);
+        }
+        updateShuffleButton();
+    }
+
+    function updateShuffleButton() {
+        if (isShuffled) {
+            shuffleBtn.textContent = '↩️';
+            shuffleBtn.title = 'Восстановить порядок';
+            shuffleBtn.classList.add('shuffled');
+        } else {
+            shuffleBtn.textContent = '🔀';
+            shuffleBtn.title = 'Перемешать';
+            shuffleBtn.classList.remove('shuffled');
+        }
+    }
+
+    document.getElementById('play-pause').addEventListener('click', togglePlayPause);
+    document.getElementById('next').addEventListener('click', nextTrack);
+    document.getElementById('prev').addEventListener('click', prevTrack);
+    shuffleBtn.addEventListener('click', shuffleTracks);
+
+    if (typeof YT !== 'undefined' && YT.Player) {
+        onYouTubeIframeAPIReady();
+    }
+
+    window.addEventListener('load', init);
+</script>
+</body>
+</html>'''
+
+    with open(player_html_path, 'w', encoding='utf-8') as f:
+        f.write(player_html)
+    logging.info("player.html создан: %s", os.path.abspath(player_html_path))
+
+    # ---------- Основной index.html (оригинальный, рабочий) ----------
     safe_site_url = html.escape(site_url)
     html_template = fr"""<!DOCTYPE html>
 <html lang="ru">
@@ -576,17 +1077,27 @@ def generate_html_report(db, site_url, output_html, tracklists_html):
         .gray {{ color: var(--text-muted); font-size: 14px; font-style: italic; }}
         .no-tcs-box {{ padding: 4px 0; }}
         .tc-author {{ font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }}
+        .player-link {{
+            margin-left: 20px;
+            font-size: 16px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }}
+        .player-link:hover {{
+            color: #a5b4fc;
+        }}
         @media (max-width: 768px) {{ .header-flex {{ flex-direction: column; align-items: flex-start; gap: 14px; }} .search-box {{ width: 100%; max-width: 100%; }} .row {{ flex-direction: column; gap: 16px; padding: 20px; }} .row::before {{ z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; }} .v-date {{ position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; }} .v-content-block {{ padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; }} .v-link {{ display: block; width: 100%; z-index: 2; }} .img-container {{ width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; }} .img-container img {{ z-index: 1 !important; }} .play-overlay {{ display: none !important; }} .v-title {{ font-size: 16px; }} .v-tcs {{ max-width: 100%; width: 100%; }} details {{ margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; }} details[open] {{ border-bottom: none; background: rgba(15,23,42,0.8); }} .no-tc-block {{ margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; }} .no-tc-block span {{ font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; }} .tc-list {{ padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; }} .t-click {{ margin-right: 6px; }} .header-panel {{ position: relative; }} summary {{ -webkit-tap-highlight-color: transparent; }} }}
     </style>
 </head>
 <body>
-<!-- Скрытая ссылка для поисковиков на полный список треклистов -->
 <a href="tracklists.html" style="display:none;" aria-hidden="true">Полный список треков (SEO)</a>
 
 <div class="parallax-notes" id="parallaxNotes"></div>
 <div class="header-panel">
     <div class="container header-flex">
-        <h2>Архив трансляций <span>Квашеной</span></h2>
+        <h2>Архив трансляций <span>Квашеной</span><a href="player.html" class="player-link">🎵 Плеер</a></h2>
         <div class="search-box">
             <form class="input-wrapper" onsubmit="event.preventDefault();">
                 <input type="text" id="sInput" class="s-input" placeholder="Поиск песни">
@@ -656,7 +1167,6 @@ def generate_html_report(db, site_url, output_html, tracklists_html):
     updateNotesPosition();
 }})();
 
-// ========== БЕЗОПАСНОЕ УДАЛЕНИЕ ТОЛЬКО ЭМОДЗИ ==========
 function removeSpecificEmojis(str) {{
     if (typeof Intl !== 'undefined' && Intl.Segmenter) {{
         const segmenter = new Intl.Segmenter('en', {{ granularity: 'grapheme' }});
@@ -675,7 +1185,6 @@ function removeSpecificEmojis(str) {{
     }}
 }}
 
-// ========== НОРМАЛИЗАЦИЯ И СИНОНИМЫ ==========
 function normalize(str) {{
     return str.toLowerCase()
               .replace(/ë/g, 'e')
@@ -794,7 +1303,6 @@ async function loadDatabase() {{
             const timecodes = entry.timecodes || [];
             const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
             const tracks = sorted.map(line => {{
-                // Удаляем диапазон таймкодов прямо здесь (frontend)
                 const cleanedLine = line.replace(
                     /(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)\s*[-–—]\s*\d{{1,2}}:\d{{2}}(?::\d{{2}})?/,
                     '$1'
@@ -1095,8 +1603,8 @@ def run_parser():
 
             save_database(db, args.db)
 
-        logging.info("Генерация отчётов...")
-        generate_html_report(db, args.site_url, args.output, args.tracklists)
+        logging.info("Генерация отчётов и плеера...")
+        generate_html_report(db, args.site_url, args.output, args.tracklists, args.player)
 
     except Exception as e:
         logging.exception("Критическая ошибка")

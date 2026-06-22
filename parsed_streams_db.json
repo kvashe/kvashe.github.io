@@ -10299,15 +10299,6 @@
     "author": "@sandrrrr"
   },
   {
-    "id": "B2hSUv8FOI0",
-    "title": "Квашеная Стримит! Поём и болтаем!",
-    "date": "26.01.2022",
-    "raw_date": "20220126",
-    "timecodes": [],
-    "list_type": "none",
-    "author": ""
-  },
-  {
     "id": "S_baVmhP4TI",
     "title": "Квашеная Стримит! Поём и болтаем!",
     "date": "19.01.2022",
@@ -10745,7 +10736,8 @@
       "2:10:45 - контрольный тихоном в голову"
     ],
     "list_type": "mixed",
-    "author": "@kuzmin1375, @Ингварръ"
+    "author": "@Ингварръ, @kuzmin1375",
+    "duration": 12112
   },
   {
     "id": "3DpMf6ptsZw",
@@ -10788,7 +10780,8 @@
       "2:04:15 и дальше)) Даша просто молодец, причем видно, что даже не выкладывалась!!!"
     ],
     "list_type": "mixed",
-    "author": "@LumBMM, @ajoajo701, @Emperor-v6 и др."
+    "author": "@Emperor-v6, @ajoajo701, @ВладимирИванов-и7ч7и и др.",
+    "duration": 12271
   },
   {
     "id": "6kI5Y0T4pE8",
@@ -10991,16 +10984,8 @@
       "02:48:36 МакSим-Знаешь ли ты"
     ],
     "list_type": "mixed",
-    "author": "@yozhikhyper1337, @anastasia_drawyt108, @Df-dv1ss и др."
-  },
-  {
-    "id": "O0XuzAy0S4o",
-    "title": "СТРИМ с песнями⭐поёт Квашеная!🧡Заходи, слушай!",
-    "date": "07.08.2021",
-    "raw_date": "20210807",
-    "timecodes": [],
-    "list_type": "none",
-    "author": ""
+    "author": "@yozhikhyper1337, @Df-dv1ss, @anastasia_drawyt108 и др.",
+    "duration": 10994
   },
   {
     "id": "Vp-hDB9UDDM",
@@ -11220,7 +11205,8 @@
     "raw_date": "20200827",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 157
   },
   {
     "id": "4j2W9j_jCz0",
@@ -11229,7 +11215,18 @@
     "raw_date": "20200624",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 184
+  },
+  {
+    "id": "U8eRSC-KVyw",
+    "title": "Песенный стрим! Капустина в прямом эфире!:))",
+    "date": "07.06.2020",
+    "raw_date": "20200607",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 5808
   },
   {
     "id": "V9fqXVPzeGQ",
@@ -11238,7 +11235,8 @@
     "raw_date": "20200330",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 426
   },
   {
     "id": "NItH7brh5q0",
@@ -11247,7 +11245,8 @@
     "raw_date": "20200327",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 374
   },
   {
     "id": "BnG2qbwwYjQ",
@@ -11256,7 +11255,8 @@
     "raw_date": "20200315",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 144
   },
   {
     "id": "v3ea-8_SXT8",
@@ -11265,7 +11265,8 @@
     "raw_date": "20200221",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 7734
   },
   {
     "id": "PEsZ3KVGrvE",
@@ -11274,7 +11275,8 @@
     "raw_date": "20200221",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 415
   },
   {
     "id": "-R-AcP0tdIk",
@@ -11283,7 +11285,8 @@
     "raw_date": "20200115",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 106
   },
   {
     "id": "2mKjZ_f8BDA",
@@ -11292,7 +11295,8 @@
     "raw_date": "20200107",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 2785
   },
   {
     "id": "bbVqCy9RYv0",
@@ -11301,7 +11305,8 @@
     "raw_date": "20200103",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 126
   },
   {
     "id": "9yqOjHWL41E",
@@ -11310,6 +11315,7 @@
     "raw_date": "20200103",
     "timecodes": [],
     "list_type": "none",
-    "author": ""
+    "author": "",
+    "duration": 573
   }
 ]
