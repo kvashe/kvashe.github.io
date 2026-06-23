@@ -137,84 +137,96 @@
             font-size: 0.8em;
             color: var(--text-muted);
         }
+        .playlist-spoiler {
+            background: rgba(15, 23, 42, 0.4);
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            transition: all 0.2s;
+        }
+        .playlist-spoiler[open] {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+        .playlist-spoiler summary {
+            font-weight: 600; cursor: pointer; color: #cbd5e1; outline: none;
+            user-select: none; font-size: 14px; list-style: none;
+        }
+        .playlist-spoiler summary::-webkit-details-marker { display: none; }
+        .playlist-spoiler summary::before {
+            content: "▼ "; font-size: 9px; color: var(--text-muted);
+            display: inline-block; transition: transform 0.2s; margin-right: 8px;
+            transform: rotate(-90deg);
+        }
+        .playlist-spoiler[open] summary::before { transform: rotate(0deg); }
+        .playlist-spoiler .tc-list {
+            margin-top: 12px; line-height: 1.7; max-height: 200px;
+            overflow-y: auto; padding-right: 8px; font-size: 14px;
+        }
+        .playlist-spoiler .tc-list::-webkit-scrollbar { width: 4px; }
+        .playlist-spoiler .tc-list::-webkit-scrollbar-track { background: transparent; }
+        .playlist-spoiler .tc-list::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.15); border-radius: 10px;
+        }
+        .playlist-spoiler .tc-click {
+            background: rgba(99, 102, 241, 0.15); color: #a5b4fc;
+            padding: 2px 8px; border-radius: 6px; font-weight: 700; cursor: pointer;
+            margin-right: 10px; display: inline-block; font-size: 13px;
+            transition: all 0.2s; font-variant-numeric: tabular-nums;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .playlist-spoiler .tc-click:hover {
+            background: var(--primary); color: #fff;
+            border-color: var(--primary); box-shadow: 0 0 10px rgba(99,102,241,0.4);
+        }
+        .playlist-spoiler .tc-item {
+            margin-bottom: 8px; border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+            padding-bottom: 6px; display: flex; align-items: center;
+        }
+        .playlist-spoiler .tc-item:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .playlist-spoiler .tc-item.playing {
+            background: rgba(99, 102, 241, 0.2); border-radius: 6px;
+            padding: 4px 8px; margin-left: -8px; margin-right: -8px;
+        }
         .controls {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            align-items: center;
+            display: flex; justify-content: center; gap: 16px; align-items: center;
         }
         button {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: var(--text-main);
-            font-size: 1.5em;
-            padding: 10px 14px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(6px);
-            width: 52px;
-            height: 52px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text-main); font-size: 1.5em; padding: 10px 14px;
+            border-radius: 12px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(6px); width: 52px; height: 52px;
         }
-        button:hover {
-            background: rgba(255,255,255,0.18);
-            border-color: rgba(255,255,255,0.3);
-        }
-        .shuffle-btn {
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.12);
-            color: var(--text-main);
-        }
-        .shuffle-btn.shuffled {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: white;
-        }
-        .volume-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 4px;
-            padding: 0 8px;
-        }
+        button:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.3); }
+        .shuffle-btn { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); color: var(--text-main); }
+        .shuffle-btn.shuffled { background: var(--primary); border-color: var(--primary); color: white; }
+        .volume-container { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 0 8px; }
         input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 6px;
-            background: rgba(255,255,255,0.15);
-            border-radius: 4px;
-            outline: none;
-            cursor: pointer;
+            -webkit-appearance: none; width: 100%; height: 6px;
+            background: rgba(255,255,255,0.15); border-radius: 4px; outline: none; cursor: pointer;
         }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            background: var(--primary);
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 6px rgba(99,102,241,0.5);
-            transition: transform 0.1s;
+            -webkit-appearance: none; width: 18px; height: 18px; background: var(--primary);
+            border-radius: 50%; cursor: pointer; border: none;
+            box-shadow: 0 0 6px rgba(99,102,241,0.5); transition: transform 0.1s;
         }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
         .playlist-link {
             text-align: center;
             margin-top: 8px;
+            font-size: 16px;
+            font-weight: 600;
         }
         .playlist-link a {
             color: var(--primary);
             text-decoration: none;
-            font-weight: 600;
+            transition: color 0.2s;
         }
-        #player {
-            width: 0; height: 0; visibility: hidden;
+        .playlist-link a:hover {
+            color: #a5b4fc;
         }
+        #player { width: 0; height: 0; visibility: hidden; }
     </style>
 </head>
 <body>
@@ -239,6 +251,10 @@
         <span id="time-current">0:00</span>
         <span id="time-duration">?:??</span>
     </div>
+    <details class="playlist-spoiler" id="playlist-spoiler">
+        <summary>Треклист стрима</summary>
+        <div class="tc-list" id="playlist-tracks"></div>
+    </details>
     <div class="controls">
         <button id="prev" title="Назад">⏮️</button>
         <button id="play-pause" title="Play/Pause">▶️</button>
@@ -274,25 +290,24 @@
         const title = (line.substring(0, matches[0].index) + line.substring(matches[0].index + matches[0][1].length)).trim();
         return { start: startSec, end: null, title: title };
     }
-
     function getSeconds(tc) {
         const parts = tc.split(':').map(Number);
         if (parts.length === 2) return parts[0]*60 + parts[1];
         if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
         return 0;
     }
+    function formatTimecode(secs) {
+        const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
 
-    let originalTracks = [];
-    let tracks = [];
+    let masterTrackList = [];
+    let shuffledList = [];
+    let currentList = [];
     let isShuffled = false;
-    let currentIndex = 0;
-    let player = null;
-    let playerReady = false;
-    let isPlaying = false;
-    let checkInterval = null;
     let currentTrack = null;
-    let videoDuration = 0;
-    let volume = 100;
+    let player = null, playerReady = false, isPlaying = false;
+    let checkInterval = null, videoDuration = 0, volume = 100;
 
     const progressBar = document.getElementById('progress-bar');
     const timeCurrent = document.getElementById('time-current');
@@ -301,21 +316,16 @@
     const trackIntegrity = document.getElementById('track-integrity');
     const shuffleBtn = document.getElementById('shuffle');
     const volumeSlider = document.getElementById('volume-slider');
+    const playlistTracks = document.getElementById('playlist-tracks');
 
     function applyVolumeToPlayer() {
         if (player && playerReady) {
             player.setVolume(volume);
-            if (volume == 0) {
-                player.mute();
-            } else {
-                player.unMute();
-            }
+            volume == 0 ? player.mute() : player.unMute();
         }
     }
-
     volumeSlider.addEventListener('input', function() {
-        volume = parseInt(this.value);
-        applyVolumeToPlayer();
+        volume = parseInt(this.value); applyVolumeToPlayer();
     });
 
     function setupMarquee(el, text) {
@@ -323,25 +333,17 @@
         const span = el.querySelector('span');
         requestAnimationFrame(() => {
             if (span.scrollWidth <= el.clientWidth) {
-                span.style.animation = 'none';
-                span.style.paddingLeft = '0';
+                span.style.animation = 'none'; span.style.paddingLeft = '0';
             } else {
-                span.style.animation = 'marquee 8s linear infinite';
-                span.style.paddingLeft = '100%';
+                span.style.animation = 'marquee 8s linear infinite'; span.style.paddingLeft = '100%';
             }
         });
     }
 
     function formatTime(seconds) {
         if (isNaN(seconds) || seconds < 0) seconds = 0;
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        if (h > 0) {
-            return h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-        } else {
-            return m + ':' + (s < 10 ? '0' : '') + s;
-        }
+        const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = Math.floor(seconds % 60);
+        return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
     }
 
     async function init() {
@@ -349,18 +351,16 @@
             const resp = await fetch('parsed_streams_db.json');
             const db = await resp.json();
             const items = Array.isArray(db) ? db : Object.values(db);
-            tracks = [];
+            masterTrackList = [];
             for (const item of items) {
                 if (!item.timecodes || (item.list_type !== 'tracklist' && item.list_type !== 'mixed')) continue;
+                const streamTracks = [];
                 for (const line of item.timecodes) {
                     const parsed = parseTimecodeRange(line);
                     if (parsed.start == null) continue;
-                    const hasEnd = parsed.end !== null;
-                    const end = parsed.end ?? parsed.start + 240;
-                    tracks.push({
-                        videoId: item.id,
-                        start: parsed.start,
-                        end: end,
+                    streamTracks.push({
+                        videoId: item.id, start: parsed.start,
+                        end: parsed.end ?? parsed.start + 240,
                         title: parsed.title,
                         streamTitle: item.title || 'Без названия',
                         streamDate: item.date || '',
@@ -368,18 +368,17 @@
                         thumbnail: `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`,
                         url: `https://www.youtube.com/watch?v=${item.id}&t=${parsed.start}s`,
                         videoDuration: item.duration || 0,
-                        hasEnd: hasEnd
+                        hasEnd: parsed.end !== null
                     });
                 }
+                streamTracks.sort((a, b) => a.start - b.start);
+                masterTrackList.push(...streamTracks);
             }
-            originalTracks = [...tracks];
+            currentList = masterTrackList;
             updateShuffleButton();
-            if (tracks.length > 0) {
-                if (playerReady) {
-                    playTrack(0);
-                } else {
-                    window._playOnReady = () => playTrack(0);
-                }
+            if (currentList.length > 0) {
+                if (playerReady) playTrackAtIndex(0);
+                else window._playOnReady = () => playTrackAtIndex(0);
             }
         } catch(e) {
             console.error('Failed to load database:', e);
@@ -389,176 +388,148 @@
 
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('player', {
-            height: '0',
-            width: '0',
-            events: {
-                'onReady': onPlayerReady,
-                'onStateChange': onPlayerStateChange
-            }
+            height: '0', width: '0',
+            events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
         });
     }
-
     function onPlayerReady(event) {
-        playerReady = true;
-        applyVolumeToPlayer();
-        if (window._playOnReady) {
-            window._playOnReady();
-            window._playOnReady = null;
-        } else if (tracks.length > 0 && !currentTrack) {
-            playTrack(0);
-        }
+        playerReady = true; applyVolumeToPlayer();
+        if (window._playOnReady) { window._playOnReady(); window._playOnReady = null; }
+        else if (currentList.length > 0 && !currentTrack) playTrackAtIndex(0);
     }
 
-    function playTrack(index) {
-        if (!tracks.length || !player || !playerReady) return;
-        currentIndex = index;
-        currentTrack = tracks[currentIndex];
+    function updatePlaylistSpoiler() {
+        if (!currentTrack) return;
+        const streamTracks = masterTrackList.filter(t => t.videoId === currentTrack.videoId);
+        if (streamTracks.length === 0) return;
+        let html = '';
+        streamTracks.forEach(tr => {
+            const tc = formatTimecode(tr.start);
+            const title = tr.title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const playingClass = (tr.start === currentTrack.start && tr.videoId === currentTrack.videoId) ? ' playing' : '';
+            html += `<div class="tc-item${playingClass}"><span class="tc-click" data-videoid="${tr.videoId}" data-start="${tr.start}">${tc}</span> ${title}</div>`;
+        });
+        playlistTracks.innerHTML = html;
+    }
+
+    function playTrackAtIndex(index) {
+        if (!currentList.length || !player || !playerReady) return;
+        currentTrack = currentList[index];
         setupMarquee(document.getElementById('track-title'), currentTrack.title);
         setupMarquee(document.getElementById('track-stream'), currentTrack.streamTitle + ' (' + currentTrack.streamDate + ')');
-        
-        if (currentTrack.hasEnd) {
-            trackIntegrity.textContent = '✅';
-            trackIntegrity.title = 'Треклист имеет начало и конец песни';
-        } else {
-            trackIntegrity.textContent = '⚠️';
-            trackIntegrity.title = 'Треклист не имеет окончания песни';
-        }
+        trackIntegrity.textContent = currentTrack.hasEnd ? '✅' : '⚠️';
+        trackIntegrity.title = currentTrack.hasEnd ? 'Треклист имеет начало и конец песни' : 'Треклист не имеет окончания песни';
         trackAuthor.textContent = currentTrack.streamAuthor ? 'Автор треклиста: ' + currentTrack.streamAuthor : '';
-        
         const thumbLink = document.getElementById('track-link');
         const thumbImg = document.getElementById('track-thumb');
-        thumbLink.classList.add('shimmer-thumb');
-        thumbImg.style.display = 'none';
-        thumbImg.src = currentTrack.thumbnail;
-        thumbLink.href = currentTrack.url;
-
-        videoDuration = currentTrack.videoDuration || 0;
-        updateDurationDisplay();
-
-        player.loadVideoById({
-            videoId: currentTrack.videoId,
-            startSeconds: currentTrack.start
-        });
+        thumbLink.classList.add('shimmer-thumb'); thumbImg.style.display = 'none';
+        thumbImg.src = currentTrack.thumbnail; thumbLink.href = currentTrack.url;
+        videoDuration = currentTrack.videoDuration || 0; updateDurationDisplay();
+        player.loadVideoById({ videoId: currentTrack.videoId, startSeconds: currentTrack.start });
+        updatePlaylistSpoiler();
     }
 
     function updateDurationDisplay() {
-        if (videoDuration > 0) {
-            timeDuration.textContent = formatTime(videoDuration);
-        } else {
-            timeDuration.textContent = '?:??';
-        }
+        timeDuration.textContent = videoDuration > 0 ? formatTime(videoDuration) : '?:??';
     }
 
     function startTimeCheck() {
         if (checkInterval) clearInterval(checkInterval);
         checkInterval = setInterval(() => {
             if (!player || !player.getCurrentTime || !currentTrack) return;
-
             if (!videoDuration || videoDuration <= 0) {
                 const dur = player.getDuration();
-                if (dur && dur > 0) {
-                    videoDuration = dur;
-                    updateDurationDisplay();
-                }
+                if (dur && dur > 0) { videoDuration = dur; updateDurationDisplay(); }
             }
-
             const currentTime = player.getCurrentTime();
-            const track = tracks[currentIndex];
-
             if (videoDuration > 0) {
-                const progress = (currentTime / videoDuration) * 100;
-                progressBar.style.width = Math.min(100, Math.max(0, progress)) + '%';
-            } else {
-                progressBar.style.width = '0%';
-            }
-
+                progressBar.style.width = Math.min(100, Math.max(0, (currentTime / videoDuration) * 100)) + '%';
+            } else progressBar.style.width = '0%';
             timeCurrent.textContent = formatTime(currentTime);
-
-            if (currentTime >= track.end) {
-                nextTrack();
-            }
+            if (currentTime >= currentTrack.end) nextTrack();
         }, 300);
     }
 
     function onPlayerStateChange(event) {
-        if (event.data === YT.PlayerState.ENDED) {
-            nextTrack();
-        } else if (event.data === YT.PlayerState.PLAYING) {
-            isPlaying = true;
-            document.getElementById('play-pause').textContent = '⏸️';
-            startTimeCheck();
+        if (event.data === YT.PlayerState.ENDED) nextTrack();
+        else if (event.data === YT.PlayerState.PLAYING) {
+            isPlaying = true; document.getElementById('play-pause').textContent = '⏸️'; startTimeCheck();
         } else if (event.data === YT.PlayerState.PAUSED) {
-            isPlaying = false;
-            document.getElementById('play-pause').textContent = '▶️';
+            isPlaying = false; document.getElementById('play-pause').textContent = '▶️';
             if (checkInterval) clearInterval(checkInterval);
         }
     }
 
     function togglePlayPause() {
         if (!player || !playerReady) return;
-        if (isPlaying) {
-            player.pauseVideo();
-        } else {
-            player.playVideo();
-        }
+        isPlaying ? player.pauseVideo() : player.playVideo();
     }
 
     function nextTrack() {
-        if (!tracks.length) return;
-        currentIndex = (currentIndex + 1) % tracks.length;
-        playTrack(currentIndex);
+        if (!currentList.length || !currentTrack) return;
+        let idx = currentList.findIndex(t => t.videoId === currentTrack.videoId && t.start === currentTrack.start);
+        if (idx === -1) return;
+        idx = (idx + 1) % currentList.length;
+        playTrackAtIndex(idx);
     }
-
     function prevTrack() {
-        if (!tracks.length) return;
-        currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
-        playTrack(currentIndex);
+        if (!currentList.length || !currentTrack) return;
+        let idx = currentList.findIndex(t => t.videoId === currentTrack.videoId && t.start === currentTrack.start);
+        if (idx === -1) return;
+        idx = (idx - 1 + currentList.length) % currentList.length;
+        playTrackAtIndex(idx);
     }
 
     function shuffleTracks() {
-        if (!originalTracks.length) return;
         if (isShuffled) {
-            const currentTrackId = tracks[currentIndex]?.videoId + '_' + tracks[currentIndex]?.start;
-            tracks = [...originalTracks];
-            const newIndex = tracks.findIndex(t => (t.videoId + '_' + t.start) === currentTrackId);
-            currentIndex = newIndex !== -1 ? newIndex : 0;
+            const currentGlobalIndex = masterTrackList.findIndex(
+                t => t.videoId === currentTrack.videoId && t.start === currentTrack.start
+            );
+            currentList = masterTrackList;
             isShuffled = false;
-            playTrack(currentIndex);
+            playTrackAtIndex(currentGlobalIndex !== -1 ? currentGlobalIndex : 0);
         } else {
-            const currentTrackId = tracks[currentIndex]?.videoId + '_' + tracks[currentIndex]?.start;
-            for (let i = tracks.length - 1; i > 0; i--) {
+            shuffledList = [...masterTrackList];
+            for (let i = shuffledList.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+                [shuffledList[i], shuffledList[j]] = [shuffledList[j], shuffledList[i]];
             }
-            const newIndex = tracks.findIndex(t => (t.videoId + '_' + t.start) === currentTrackId);
-            currentIndex = newIndex !== -1 ? newIndex : 0;
+            currentList = shuffledList;
             isShuffled = true;
-            playTrack(currentIndex);
+            playTrackAtIndex(0);
         }
         updateShuffleButton();
     }
 
     function updateShuffleButton() {
         if (isShuffled) {
-            shuffleBtn.textContent = '↩️';
-            shuffleBtn.title = 'Восстановить порядок';
+            shuffleBtn.textContent = '↩️'; shuffleBtn.title = 'Восстановить порядок';
             shuffleBtn.classList.add('shuffled');
         } else {
-            shuffleBtn.textContent = '🔀';
-            shuffleBtn.title = 'Перемешать';
+            shuffleBtn.textContent = '🔀'; shuffleBtn.title = 'Перемешать';
             shuffleBtn.classList.remove('shuffled');
         }
     }
+
+    playlistTracks.addEventListener('click', function(e) {
+        if (e.target.classList.contains('tc-click')) {
+            const videoId = e.target.getAttribute('data-videoid');
+            const start = parseInt(e.target.getAttribute('data-start'));
+            const masterIndex = masterTrackList.findIndex(t => t.videoId === videoId && t.start === start);
+            if (masterIndex !== -1) {
+                const trackToPlay = masterTrackList[masterIndex];
+                const currentIndex = currentList.findIndex(t => t.videoId === trackToPlay.videoId && t.start === trackToPlay.start);
+                if (currentIndex !== -1) playTrackAtIndex(currentIndex);
+            }
+        }
+    });
 
     document.getElementById('play-pause').addEventListener('click', togglePlayPause);
     document.getElementById('next').addEventListener('click', nextTrack);
     document.getElementById('prev').addEventListener('click', prevTrack);
     shuffleBtn.addEventListener('click', shuffleTracks);
 
-    if (typeof YT !== 'undefined' && YT.Player) {
-        onYouTubeIframeAPIReady();
-    }
-
+    if (typeof YT !== 'undefined' && YT.Player) onYouTubeIframeAPIReady();
     window.addEventListener('load', init);
 </script>
 </body>
