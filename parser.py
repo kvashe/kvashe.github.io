@@ -958,7 +958,15 @@ def generate_html_report(db, site_url, output_html, tracklists_html, player_html
         </a>
     </div>
 </div>
-<div id="ytplayer" style="position:absolute;width:0;height:0;visibility:hidden;"></div>
+<div id="ytplayer"
+     style="
+        position:absolute;
+        width:1px;
+        height:1px;
+        opacity:0.01;
+        pointer-events:none;
+     ">
+</div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 var artworkContainer = document.getElementById('artworkContainer');
@@ -1002,6 +1010,11 @@ var checkInterval = null;
 var videoDuration = 0;
 var volume = 100;
 var lastArtworkUrl = '';
+var switchingTrack = false;
+var pendingAutoplay = false;
+var wasMuted = false;
+var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+var isChromeIOS = /CriOS/.test(navigator.userAgent);
 
 function parseTimecodeRange(line) {
     var re = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
@@ -1084,14 +1097,11 @@ function rgbToHsl(r, g, b) {
 
 function setupMarquee(element, text) {
     element.classList.remove('marquee');
-
     var inner = element.querySelector('span');
     inner.textContent = text;
-
     requestAnimationFrame(function() {
         if (inner.scrollWidth > element.clientWidth) {
             inner.textContent = text + '     ' + text;
-
             requestAnimationFrame(function() {
                 var duration = inner.scrollWidth / 40;
                 element.style.setProperty('--marquee-duration', duration + 's');
@@ -1099,6 +1109,18 @@ function setupMarquee(element, text) {
             });
         }
     });
+}
+
+function forcePlay(retries) {
+    if (!player || !playerReady) return;
+    var state = player.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) return;
+    player.playVideo();
+    if (retries > 0) {
+        setTimeout(function() {
+            forcePlay(retries - 1);
+        }, 500);
+    }
 }
 
 function init() {
@@ -1157,8 +1179,18 @@ window.onArtworkError = function() {
 
 window.onYouTubeIframeAPIReady = function() {
     player = new YT.Player('ytplayer', {
-        height: '0', width: '0',
-        events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
+        height: '150',
+        width: '200',
+        playerVars: {
+            autoplay: 1,
+            playsinline: 1,
+            mute: 0,
+            rel: 0
+        },
+        events: {
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange
+        }
     });
 };
 
@@ -1169,54 +1201,106 @@ function onPlayerReady(event) {
 }
 
 function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.ENDED) {
-        if (isRepeating) {
-            if (currentTrack && player && playerReady) {
-                player.seekTo(currentTrack.start);
-                setTimeout(function() {
-                    player.playVideo();
-                }, 100);
-            }
-        } else {
-            nextTrack();
+    var state = event.data;
+    
+    if ((state === YT.PlayerState.CUED || state === YT.PlayerState.BUFFERING) && pendingAutoplay) {
+        pendingAutoplay = false;
+        
+        if (isChromeIOS) {
+            player.mute();
+            wasMuted = true;
         }
-    } else if (event.data === YT.PlayerState.PLAYING) {
+        
+        setTimeout(function() {
+            player.playVideo();
+            if (wasMuted) {
+                setTimeout(function() {
+                    player.unMute();
+                    wasMuted = false;
+                }, 1500);
+            }
+        }, 500);
+        return;
+    }
+    
+    if (state === YT.PlayerState.PLAYING) {
+        pendingAutoplay = false;
         isPlaying = true;
         playIcon.style.display = 'none';
         pauseIcon.style.display = '';
         startTimeCheck();
         artworkContainer.classList.add('playing');
         playingIndicator.classList.add('active');
-    } else if (event.data === YT.PlayerState.PAUSED) {
+    } else if (state === YT.PlayerState.PAUSED) {
+        if (pendingAutoplay && isChromeIOS) {
+            forcePlay(5);
+            return;
+        }
         isPlaying = false;
         playIcon.style.display = '';
         pauseIcon.style.display = 'none';
         if (checkInterval) clearInterval(checkInterval);
         artworkContainer.classList.remove('playing');
         playingIndicator.classList.remove('active');
+    } else if (state === YT.PlayerState.ENDED) {
+        if (!switchingTrack) {
+            if (isRepeating) {
+                if (currentTrack && player && playerReady) {
+                    player.seekTo(currentTrack.start);
+                    setTimeout(function() {
+                        player.playVideo();
+                    }, 300);
+                }
+            } else {
+                nextTrack();
+            }
+        }
     }
 }
 
 function playTrackAtIndex(index) {
     if (!currentList.length || !player || !playerReady) return;
-    currentTrack = currentList[index];
+    var newTrack = currentList[index];
     
+    if (currentTrack && currentTrack.videoId === newTrack.videoId) {
+        currentTrack = newTrack;
+        updateTrackUI();
+        player.seekTo(currentTrack.start, true);
+        if (isPlaying || isChromeIOS) {
+            setTimeout(function() {
+                player.playVideo();
+            }, 200);
+        }
+        updateTrackListUI();
+        scrollToActiveTrack();
+        return;
+    }
+    
+    currentTrack = newTrack;
+    updateTrackUI();
+    pendingAutoplay = true;
+    
+    player.loadVideoById({
+        videoId: currentTrack.videoId,
+        startSeconds: currentTrack.start
+    });
+    
+    updateTrackListUI();
+    scrollToActiveTrack();
+}
+
+function updateTrackUI() {
     setupMarquee(trackTitle, currentTrack.title);
     setupMarquee(streamInfo, currentTrack.streamTitle + ' \u00b7 ' + currentTrack.streamDate);
-    
     trackAuthor.textContent = currentTrack.streamAuthor ? 'Автор треклиста: ' + currentTrack.streamAuthor : '';
     trackIntegrity.textContent = currentTrack.hasEnd ? '\u2705' : '\u26a0\ufe0f';
     trackIntegrity.title = currentTrack.hasEnd ? 'Треклист имеет начало и конец песни' : 'Треклист не имеет времени конца песни';
-    
     artworkImage.src = currentTrack.thumbnail;
     videoDuration = currentTrack.videoDuration || 0;
     timeDuration.textContent = videoDuration > 0 ? formatTime(videoDuration) : '?:??';
     timeCurrent.textContent = '0:00';
     progressFill.style.width = '0%';
     progressThumb.style.left = '0%';
-    player.loadVideoById({ videoId: currentTrack.videoId, startSeconds: currentTrack.start });
-    updateTrackListUI();
-    scrollToActiveTrack();
 }
 
 function startTimeCheck() {
@@ -1234,12 +1318,12 @@ function startTimeCheck() {
             progressFill.style.width = percent + '%';
             progressThumb.style.left = percent + '%';
         }
-        if (currentTime >= currentTrack.end) {
+        if (currentTime >= currentTrack.end && !switchingTrack) {
             if (isRepeating) {
                 player.seekTo(currentTrack.start);
                 setTimeout(function() {
                     player.playVideo();
-                }, 100);
+                }, 300);
             } else {
                 nextTrack();
             }
@@ -1253,23 +1337,27 @@ function togglePlayPause() {
 }
 
 function nextTrack() {
-    if (!currentList.length || !currentTrack) return;
+    if (switchingTrack || !currentList.length || !currentTrack) return;
+    switchingTrack = true;
     var idx = -1;
     for (var i = 0; i < currentList.length; i++) {
         if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) { idx = i; break; }
     }
-    if (idx === -1) return;
+    if (idx === -1) { switchingTrack = false; return; }
     playTrackAtIndex((idx + 1) % currentList.length);
+    setTimeout(function() { switchingTrack = false; }, 1000);
 }
 
 function prevTrack() {
-    if (!currentList.length || !currentTrack) return;
+    if (switchingTrack || !currentList.length || !currentTrack) return;
+    switchingTrack = true;
     var idx = -1;
     for (var i = 0; i < currentList.length; i++) {
         if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) { idx = i; break; }
     }
-    if (idx === -1) return;
+    if (idx === -1) { switchingTrack = false; return; }
     playTrackAtIndex((idx - 1 + currentList.length) % currentList.length);
+    setTimeout(function() { switchingTrack = false; }, 1000);
 }
 
 function shuffleTracks() {
