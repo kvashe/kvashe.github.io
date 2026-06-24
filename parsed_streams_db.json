@@ -1,5 +1,15 @@
 [
   {
+    "id": "O-2Pox4MwHM",
+    "title": "САША ПОЕТ ПЕСНИ 💜",
+    "date": "24.06.2026",
+    "raw_date": "20260624",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 0
+  },
+  {
     "id": "o5frspCVLco",
     "title": "КВАШЕНАЯ САША ПОЕТ ПЕСНИ 💜",
     "date": "20.06.2026",
@@ -10781,7 +10791,7 @@
       "2:04:15 и дальше)) Даша просто молодец, причем видно, что даже не выкладывалась!!!"
     ],
     "list_type": "mixed",
-    "author": "@ajoajo701, @Emperor-v6, @shungan1288 и др.",
+    "author": "@Emperor-v6, @ВолодимирВасиленко1, @ajoajo701 и др.",
     "duration": 12271
   },
   {
@@ -10985,7 +10995,7 @@
       "02:48:36 МакSим-Знаешь ли ты"
     ],
     "list_type": "mixed",
-    "author": "@anastasia_drawyt108, @Df-dv1ss, @ajoajo701 и др.",
+    "author": "@Df-dv1ss, @yozhikhyper1337, @ajoajo701 и др.",
     "duration": 10994
   },
   {
@@ -11230,6 +11240,26 @@
     "author": "@fardream"
   },
   {
+    "id": "mW85mXXNQ1o",
+    "title": "4-часовой стрим с песнями 🤩✨💖",
+    "date": "23.01.2021",
+    "raw_date": "20210123",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 15010
+  },
+  {
+    "id": "ByhBAY0ejMw",
+    "title": "Что петь будем?))) Капустина стримит! 🎁 🎄",
+    "date": "02.01.2021",
+    "raw_date": "20210102",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 12173
+  },
+  {
     "id": "_u3NoBCFOQQ",
     "title": "Песенный стрим) Капустина с Мамой в прямом эфире!:))",
     "date": "27.08.2020",
@@ -11358,5 +11388,35 @@
     "list_type": "none",
     "author": "",
     "duration": 573
+  },
+  {
+    "id": "Ga-sGu4cRp0",
+    "title": "НОВОГОДНИЙ СТРИМ!! заходи, я тебя жду! будем петь вместе)))",
+    "date": "31.12.2019",
+    "raw_date": "20191231",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 4567
+  },
+  {
+    "id": "OUpHhCFkJqk",
+    "title": "у меня тут стрим, заходи, я тебя жду! 10 Марта 2019",
+    "date": "10.03.2019",
+    "raw_date": "20190310",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 2120
+  },
+  {
+    "id": "grHBnXLT3kM",
+    "title": "у меня тут стрим, заходи, я тебя жду! 10 февраля 2019",
+    "date": "10.02.2019",
+    "raw_date": "20190210",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 6798
   }
 ]
