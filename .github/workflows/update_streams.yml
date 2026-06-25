@@ -2,8 +2,8 @@ name: Update Streams Database
 
 on:
   schedule:
-    - cron: '0 9 * * *'
-      timezone: 'Europe/Stockholm'
+    - cron: '0 10 * * *'
+      timezone: 'Europe/Moscow'
   workflow_dispatch:          # возможность запуска вручную
 
 jobs:
