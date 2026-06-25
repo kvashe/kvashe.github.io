@@ -28,6 +28,7 @@ MIN_AVG_TIMECODE_GAP = 20
 FORCE_AUTHOR = None
 DEBUG = True
 SITE_URL = "https://kvashe.github.io"
+LAST_SPONSOR_CHECK_FILE = "last_sponsor_check.txt"
 
 # ===== 1. Скомпилированная регулярка =====
 TIMECODE_RE = re.compile(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b')
@@ -149,6 +150,105 @@ def get_video_comments_via_api(video_id, api_key, max_comments=3000):
             break
     return comments
 
+def check_sponsor_batch(video_ids, api_key):
+    """
+    Проверяет пачку видео одним запросом.
+    Видео НЕ спонсорское если: в ответе есть statistics.viewCount.
+    Если viewCount отсутствует - видео спонсорское.
+    """
+    if not video_ids:
+        return set()
+    
+    available_videos = set()
+    total_batches = (len(video_ids) + 49) // 50
+    
+    for i in range(0, len(video_ids), 50):
+        batch = video_ids[i:i+50]
+        batch_num = i // 50 + 1
+        
+        logging.info(
+            "Проверка batch %d/%d (%d видео)...",
+            batch_num,
+            total_batches,
+            len(batch)
+        )
+        
+        for attempt in range(2):
+            try:
+                resp = SESSION.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={
+                        "key": api_key,
+                        "part": "statistics",
+                        "id": ",".join(batch)
+                    },
+                    timeout=10
+                )
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    items = data.get("items", [])
+                    returned_ids = {item["id"] for item in items}
+                    
+                    public_count = 0
+                    sponsor_count = 0
+                    
+                    for item in items:
+                        video_id = item["id"]
+                        stats = item.get("statistics", {})
+                        
+                        # Ключевая проверка: наличие viewCount
+                        if "viewCount" in stats:
+                            available_videos.add(video_id)
+                            public_count += 1
+                            logging.debug(
+                                "✅ %s: viewCount=%s (доступно)",
+                                video_id,
+                                stats["viewCount"]
+                            )
+                        else:
+                            sponsor_count += 1
+                            logging.debug(
+                                "❌ %s: viewCount отсутствует (спонсорское)",
+                                video_id
+                            )
+                    
+                    # Видео, которые не вернулись в ответе
+                    missing = set(batch) - returned_ids
+                    if missing:
+                        logging.debug(
+                            "❌ %d видео отсутствуют в ответе API (удалены или недоступны)",
+                            len(missing)
+                        )
+                    
+                    logging.info(
+                        "Batch %d/%d: доступно=%d, спонсорских=%d, отсутствуют=%d",
+                        batch_num,
+                        total_batches,
+                        public_count,
+                        sponsor_count,
+                        len(missing)
+                    )
+                    
+                    break
+                    
+                elif resp.status_code == 403:
+                    logging.warning("Доступ запрещён для batch запроса %d/%d", batch_num, total_batches)
+                    break
+                    
+            except Exception as e:
+                logging.warning(
+                    "Ошибка batch %d/%d проверки (попытка %d): %s",
+                    batch_num,
+                    total_batches,
+                    attempt + 1,
+                    e
+                )
+                if attempt == 0:
+                    time.sleep(2)
+    
+    return available_videos
+
 def get_video_duration(video_id, api_key):
     try:
         resp = SESSION.get(
@@ -166,6 +266,27 @@ def get_video_duration(video_id, api_key):
     except Exception as e:
         logging.warning("Не удалось получить длительность для %s: %s", video_id, e)
     return 0
+
+# ==================== ПРОВЕРКА СПОНСОРСКИХ ВИДЕО ====================
+def should_run_sponsor_check():
+    if not os.path.exists(LAST_SPONSOR_CHECK_FILE):
+        return True
+
+    try:
+        with open(LAST_SPONSOR_CHECK_FILE, "r", encoding="utf-8") as f:
+            last_check = f.read().strip()
+
+        last_date = datetime.datetime.strptime(last_check, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+        days_passed = (datetime.datetime.now(datetime.timezone.utc) - last_date).days
+
+        return days_passed >= 30
+
+    except Exception:
+        return True
+
+def update_sponsor_check_date():
+    with open(LAST_SPONSOR_CHECK_FILE, "w", encoding="utf-8") as f:
+        f.write(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"))
 
 # ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
 def get_timecode_seconds(line):
@@ -345,7 +466,8 @@ def parse_single_video(video_entry, api_key, db, args):
         "timecodes": timecodes,
         "list_type": list_type,
         "author": author,
-        "duration": duration
+        "duration": duration,
+        "is_sponsor": False
     }
     with db_lock:
         db[video_id] = video_data
@@ -372,6 +494,13 @@ def generate_sitemap(site_url):
 
 def generate_html_report(db, site_url, output_html, tracklists_html, player_html_path):
     logging.info("Генерация HTML-отчётов и плеера...")
+
+    # Проверяем, есть ли спонсорские видео в базе
+    has_sponsor_videos = any(
+        item.get("is_sponsor", False) 
+        for item in db.values() 
+        if item.get('list_type') in ('tracklist', 'mixed')
+    )
 
     # ---------- SEO-страница ----------
     streams_for_seo = [
@@ -1520,6 +1649,7 @@ window.addEventListener('load', init);
 
     # ---------- Основной index.html ----------
     safe_site_url = html.escape(site_url)
+    
     html_template = fr"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1577,6 +1707,53 @@ window.addEventListener('load', init);
         #searchStats {{ color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; margin: 10px 0 4px 4px; pointer-events: none; }}
         .s-clear-btn {{ position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }}
         .s-clear-btn:hover {{ background: rgba(255, 255, 255, 0.2); color: #fff; }}
+        .sponsor-toggle {{
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }}
+        .sponsor-toggle input[type="checkbox"] {{
+            display: none !important;
+        }}
+        .sponsor-toggle .toggle-switch {{
+            width: 36px;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            position: relative;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }}
+        .sponsor-toggle .toggle-switch::after {{
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: #94a3b8;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }}
+        .sponsor-toggle input:checked + .toggle-switch {{
+            background: var(--primary);
+        }}
+        .sponsor-toggle input:checked + .toggle-switch::after {{
+            left: 18px;
+            background: white;
+        }}
+        .row.sponsor {{
+            border-color: rgba(245, 158, 11, 0.3) !important;
+            background: linear-gradient(180deg, rgba(30, 25, 15, 0.88), rgba(25, 20, 10, 0.94)) !important;
+        }}
+        .row.sponsor::before {{
+            filter: blur(40px) brightness(0.15) saturate(0.5) sepia(0.5) !important;
+            opacity: 0.4 !important;
+        }}
         .year-filters {{ display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }}
         .year-btn {{ background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 14px; flex-shrink: 0; }}
         .year-btn:hover {{ border-color: rgba(255,255,255,0.2); color: #fff; }}
@@ -1655,6 +1832,11 @@ window.addEventListener('load', init);
                 <button type="button" id="sClear" class="s-clear-btn" title="Очистить поиск">✕</button>
             </form>
             <div id="searchStats">Найдено трансляций: 0</div>
+            <label class="sponsor-toggle" id="sponsorToggleLabel" style="display:none;">
+                <input type="checkbox" id="sponsorToggle" onchange="executeSearch(searchInput.value.toLowerCase().trim())">
+                <span class="toggle-switch"></span>
+                Показывать спонсорские видео
+            </label>
         </div>
     </div>
 </div>
@@ -1885,11 +2067,13 @@ function renderStreamHTML(stream) {{
     const rawYear = (stream.raw_date || '0000').substring(0,4);
     const timecodes = stream.timecodes || [];
     const listType = stream.list_type || 'none';
+    const isSponsor = stream.is_sponsor || false;
     const hasTracks = timecodes.length > 0;
+    const sponsorClass = isSponsor ? ' sponsor' : '';
     const badgeClass = `badge-${{listType}}`;
     const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
     const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${{timecodes.length}}</span><span class="badge ${{badgeClass}}">${{badgeText}}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
-    return `<div class="row" data-id="${{vId}}" data-year="${{rawYear}}" style="--bg-thumb: url('https://img.youtube.com/vi/${{vId}}/hqdefault.jpg');"><span class="v-date">${{date}}</span><a class="v-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${{vId}}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><span class="v-title">${{title}}</span></a><div class="v-tcs">${{tcsHTML}}</div></div></div>`;
+    return `<div class="row${{sponsorClass}}" data-id="${{vId}}" data-year="${{rawYear}}" style="--bg-thumb: url('https://img.youtube.com/vi/${{vId}}/hqdefault.jpg');"><span class="v-date">${{date}}</span><a class="v-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${{vId}}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><span class="v-title">${{title}}</span></a><div class="v-tcs">${{tcsHTML}}</div></div></div>`;
 }}
 
 function animateContainer(container) {{
@@ -1939,9 +2123,24 @@ function initYearFilters() {{
     allRows.forEach(row => {{ const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); }});
     const sortedYears = Array.from(yearsSet).sort().reverse();
     const container = document.getElementById('yearFilters');
-    let html = '<button class="year-btn active" data-year="all">Все годы</button>';
-    sortedYears.forEach(y => html += `<button class="year-btn" data-year="${{y}}">${{y}} года</button>`);
+    const currentYear = new Date().getFullYear().toString();
+    
+    let html = '<button class="year-btn" data-year="all">Все годы</button>';
+    sortedYears.forEach(y => {{
+        const isActive = y === currentYear ? ' active' : '';
+        html += `<button class="year-btn${{isActive}}" data-year="${{y}}">${{y}} года</button>`;
+    }});
     container.innerHTML = html;
+    
+    // Если есть кнопка текущего года - активируем её
+    if (sortedYears.includes(currentYear)) {{
+        activeYear = currentYear;
+    }} else {{
+        activeYear = 'all';
+        const allBtn = container.querySelector('[data-year="all"]');
+        if (allBtn) allBtn.classList.add('active');
+    }}
+    
     container.addEventListener('click', (e) => {{
         if(e.target.classList.contains('year-btn')) {{
             document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
@@ -1986,6 +2185,8 @@ const statsEl = document.getElementById('searchStats');
 async function executeSearch(filter) {{
     if (allRows.length === 0) return;
     let visibleCount = 0;
+    const sponsorToggle = document.getElementById('sponsorToggle');
+    const showSponsors = sponsorToggle ? sponsorToggle.checked : false;
     const variants = filter ? getSearchVariants(filter) : [];
     clearBtn.style.display = filter ? 'flex' : 'none';
     allRows.forEach(row => {{
@@ -1998,7 +2199,14 @@ async function executeSearch(filter) {{
         }}
     }});
     if (!filter) {{
-        allRows.forEach(row => {{ const rowYear = row.getAttribute('data-year'); if (activeYear === 'all' || rowYear === activeYear) {{ row.style.display = ''; visibleCount++; }} }});
+        allRows.forEach(row => {{ 
+            const rowYear = row.getAttribute('data-year'); 
+            const isSponsor = row.classList.contains('sponsor');
+            if ((activeYear === 'all' || rowYear === activeYear) && (showSponsors || !isSponsor)) {{ 
+                row.style.display = ''; 
+                visibleCount++; 
+            }} 
+        }});
         statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
         return;
     }}
@@ -2012,6 +2220,8 @@ async function executeSearch(filter) {{
         const rowYear = row.getAttribute('data-year');
         if (activeYear !== 'all' && rowYear !== activeYear) return;
         if (!matchedIds.has(vId)) return;
+        const isSponsor = row.classList.contains('sponsor');
+        if (!showSponsors && isSponsor) return;
         row.style.display = '';
         visibleCount++;
         if (isDesktop && filter.length >= 2) {{
@@ -2042,6 +2252,13 @@ document.addEventListener('DOMContentLoaded', async () => {{
     await loadDatabase();
     renderAllStreams();
     initYearFilters();
+    
+    // Показываем переключатель если есть спонсорские видео
+    const sponsorToggleLabel = document.getElementById('sponsorToggleLabel');
+    if (sponsorToggleLabel && document.querySelector('.row.sponsor')) {{
+        sponsorToggleLabel.style.display = 'flex';
+    }}
+    
     executeSearch('');
 }});
 
@@ -2153,6 +2370,68 @@ def run_parser():
                 executor.map(worker, videos_to_parse)
 
             save_database(db, args.db)
+
+        # Ежемесячная проверка спонсорских видео
+        if should_run_sponsor_check():
+            logging.info("Запуск ежемесячной проверки спонсорских видео")
+
+            # Собираем все видео для проверки (tracklist и mixed)
+            videos_to_check = []
+            for video_id, video_data in db.items():
+                if video_data.get("list_type") in ("tracklist", "mixed"):
+                    videos_to_check.append(video_id)
+            
+            logging.info("Найдено %d видео с треклистами в базе", len(videos_to_check))
+            
+            if videos_to_check:
+                # Проверяем все видео пачками по 50
+                available_videos = check_sponsor_batch(videos_to_check, api_key)
+                
+                logging.info(
+                    "API вернул %d доступных видео из %d запрошенных",
+                    len(available_videos),
+                    len(videos_to_check)
+                )
+                
+                # Обновляем статусы
+                sponsors_found = 0
+                already_sponsored = 0
+                still_available = 0
+                
+                for video_id in videos_to_check:
+                    if video_id in available_videos:
+                        # Видео доступно
+                        if db[video_id].get("is_sponsor", False):
+                            logging.info("Видео перестало быть спонсорским: %s", db[video_id].get("title", video_id))
+                        db[video_id]["is_sponsor"] = False
+                        still_available += 1
+                    else:
+                        # Видео недоступно
+                        if not db[video_id].get("is_sponsor", False):
+                            sponsors_found += 1
+                            logging.info(
+                                "Видео стало спонсорским: %s",
+                                db[video_id].get("title", video_id)
+                            )
+                        else:
+                            already_sponsored += 1
+                        db[video_id]["is_sponsor"] = True
+                
+                update_sponsor_check_date()
+                
+                logging.info(
+                    "Результаты проверки: доступно=%d, стало спонсорскими=%d, уже были спонсорскими=%d",
+                    still_available,
+                    sponsors_found,
+                    already_sponsored
+                )
+            else:
+                logging.info("Нет видео для проверки")
+        else:
+            logging.info("Ежемесячная проверка спонсорских видео не требуется (прошло меньше 30 дней)")
+
+        # Сохраняем базу после проверки спонсорских видео
+        save_database(db, args.db)
 
         logging.info("Генерация отчётов и плеера...")
         generate_html_report(db, args.site_url, args.output, args.tracklists, args.player)

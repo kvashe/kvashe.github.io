@@ -31,7 +31,8 @@
     ],
     "list_type": "tracklist",
     "author": "@sandrrrr",
-    "duration": 8174
+    "duration": 8174,
+    "is_sponsor": false
   },
   {
     "id": "o5frspCVLco",
@@ -67,7 +68,9 @@
       "02:16:05 - 02:19:11 (М/ф \"Аладдин\") Арабская ночь"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8581,
+    "is_sponsor": false
   },
   {
     "id": "9DBmFWchZnM",
@@ -108,7 +111,9 @@
       "02:49:32 - 02:51:06 (С переводом) ZXKAI, slxughter - NO BATIDÃO"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10346,
+    "is_sponsor": false
   },
   {
     "id": "h_ILRA9a7_U",
@@ -144,7 +149,9 @@
       "02:32:32 - 02:32:46 и 02:33:08 - 02:33:22 (ОТРЫВКИ БУДУЩЕЙ АВТОРСКОЙ НОВИНКИ; А капелла) Квашеная - Фиолетово"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9245,
+    "is_sponsor": false
   },
   {
     "id": "HaJE2nU78eA",
@@ -174,7 +181,9 @@
       "02:16:38 - 02:17:31 (С переводом) Rafaella Carrà - Pedro"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8341,
+    "is_sponsor": false
   },
   {
     "id": "_tPa_MVkqkA",
@@ -211,7 +220,9 @@
       "02:51:36 Квашеная - С любовью из облаков"
     ],
     "list_type": "tracklist",
-    "author": "@mstislav007"
+    "author": "@mstislav007",
+    "duration": 10736,
+    "is_sponsor": false
   },
   {
     "id": "pwseI_ecT8g",
@@ -246,7 +257,9 @@
       "02:40:53 - 02:43:15 (АВТОРСКАЯ) Квашеная - Мгновение"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9865,
+    "is_sponsor": false
   },
   {
     "id": "8sdcpWKRIys",
@@ -279,7 +292,9 @@
       "02:59:09 - 03:00:58 Король и Шут - Дурак и молния"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10970,
+    "is_sponsor": false
   },
   {
     "id": "Cmtp3NqiF4Q",
@@ -316,7 +331,9 @@
       "02:50:45 - 02:53:39 (АВТОРСКАЯ) Квашеная - Весна"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10574,
+    "is_sponsor": false
   },
   {
     "id": "pyUrGAnPy_M",
@@ -342,7 +359,9 @@
       "02:08:14 - 02:11:08 (АВТОРСКАЯ ГОСТЕЙ) NEMIGA - Не сбылось"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8269,
+    "is_sponsor": false
   },
   {
     "id": "bEU44YpC8T4",
@@ -368,7 +387,9 @@
       "02:37:30 - 02:40:23 (АВТОРСКАЯ) Квашеная - Дыхание"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10144,
+    "is_sponsor": false
   },
   {
     "id": "HmMAPL8dyns",
@@ -398,7 +419,9 @@
       "02:59:19 - 03:03:22 Юрий Шатунов - Седая ночь"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11192,
+    "is_sponsor": false
   },
   {
     "id": "9rVRL_f79OQ",
@@ -424,7 +447,9 @@
       "02:20:26 - 02:23:08 Бьянка - А чё чё"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8835,
+    "is_sponsor": false
   },
   {
     "id": "O5YcTtS-4Zo",
@@ -456,7 +481,9 @@
       "03:08:05 - 03:11:22 (АВТОРСКАЯ АДАПТАЦИЯ ГОСТЯ) Hi-Fi - Седьмой лепесток"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11601,
+    "is_sponsor": false
   },
   {
     "id": "rMr7jdjacq0",
@@ -489,7 +516,9 @@
       "02:51:33 - 02:54:13 (АВТОРСКАЯ НОВИНКА) Квашеная - Ночной автобус"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10561,
+    "is_sponsor": false
   },
   {
     "id": "DYd7xoHnRQM",
@@ -523,7 +552,9 @@
       "02:45:46 - 02:49:10 Dead Blonde - Мальчик на девятке"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10240,
+    "is_sponsor": false
   },
   {
     "id": "bXKefNLi7Vw",
@@ -554,7 +585,9 @@
       "02:44:07 - 02:45:54  ✨ (А) Улетай на крыльях ветра 🕊,"
     ],
     "list_type": "tracklist",
-    "author": "@humanornot"
+    "author": "@humanornot",
+    "duration": 10188,
+    "is_sponsor": false
   },
   {
     "id": "R9ECVW1ISmk",
@@ -584,7 +617,9 @@
       "02:06:12 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7630,
+    "is_sponsor": false
   },
   {
     "id": "W184zMbod5A",
@@ -614,7 +649,9 @@
       "02:10:58 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7910,
+    "is_sponsor": false
   },
   {
     "id": "Nq7u3G_MPZw",
@@ -644,7 +681,9 @@
       "02:08:16 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7751,
+    "is_sponsor": false
   },
   {
     "id": "vr5_7bPrW9E",
@@ -674,7 +713,9 @@
       "02:09:03 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7795,
+    "is_sponsor": false
   },
   {
     "id": "Ai2GO2AAqqQ",
@@ -705,7 +746,9 @@
       "02:07:15 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7688,
+    "is_sponsor": false
   },
   {
     "id": "_NGSGsV9xZQ",
@@ -734,7 +777,9 @@
       "02:10:49 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7906,
+    "is_sponsor": false
   },
   {
     "id": "vGwkc4tnscA",
@@ -765,7 +810,9 @@
       "02:10:31 Обновлённые титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7885,
+    "is_sponsor": false
   },
   {
     "id": "1d-9g3TaF2Y",
@@ -794,7 +841,9 @@
       "02:05:22 - 02:07:10  ✨ Король и Шут - Дурак и молния 🤪⚡,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7721,
+    "is_sponsor": false
   },
   {
     "id": "sFcHTMlPFaI",
@@ -823,7 +872,9 @@
       "02:00:40 - 02:03:58  ✨  Dead Blonde - Мальчик на девятке 🚗,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7522,
+    "is_sponsor": false
   },
   {
     "id": "SyvSuR5Z30E",
@@ -853,7 +904,9 @@
       "02:10:17 - 02:12:13  ✅ Лолита - На Титанике 🧊🚢,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7996,
+    "is_sponsor": false
   },
   {
     "id": "baqMeOYI3ho",
@@ -882,7 +935,9 @@
       "02:00:45 - 02:03:52  ✅ Король и Шут - Лесник 🐺(+\"АУУУУУУУ\"),"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7550,
+    "is_sponsor": false
   },
   {
     "id": "xE-MDWPR_kI",
@@ -921,7 +976,9 @@
       "02:59:44 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10840,
+    "is_sponsor": false
   },
   {
     "id": "jaGp0ypP2M8",
@@ -961,7 +1018,9 @@
       "03:14:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11707,
+    "is_sponsor": false
   },
   {
     "id": "KvBVw42M3f4",
@@ -998,7 +1057,9 @@
       "03:03:47 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11080,
+    "is_sponsor": false
   },
   {
     "id": "UiaLtRQrCo0",
@@ -1037,7 +1098,9 @@
       "03:05:15 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11170,
+    "is_sponsor": false
   },
   {
     "id": "EF6BEZkmIPc",
@@ -1072,7 +1135,9 @@
       "03:04:24 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11116,
+    "is_sponsor": false
   },
   {
     "id": "z1xK2c1ZuD4",
@@ -1108,7 +1173,9 @@
       "03:06:22 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11243,
+    "is_sponsor": false
   },
   {
     "id": "IXuFLs9Qs0U",
@@ -1145,7 +1212,9 @@
       "03:12:13 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11592,
+    "is_sponsor": false
   },
   {
     "id": "ZOGlHNH_EaE",
@@ -1181,7 +1250,9 @@
       "03:04:54 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11153,
+    "is_sponsor": false
   },
   {
     "id": "suXva41dzRs",
@@ -1219,7 +1290,9 @@
       "03:15:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11814,
+    "is_sponsor": false
   },
   {
     "id": "-DyjYNOi39g",
@@ -1257,7 +1330,9 @@
       "03:05:01 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11157,
+    "is_sponsor": false
   },
   {
     "id": "KHBVpibCszk",
@@ -1294,7 +1369,9 @@
       "03:18:16 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11952,
+    "is_sponsor": false
   },
   {
     "id": "fL9lv0A731o",
@@ -1332,7 +1409,9 @@
       "03:04:25 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11121,
+    "is_sponsor": false
   },
   {
     "id": "-5AsQJGRBdw",
@@ -1369,7 +1448,9 @@
       "03:11:31 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11551,
+    "is_sponsor": false
   },
   {
     "id": "PQVu_Z01FCo",
@@ -1404,7 +1485,9 @@
       "03:03:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11090,
+    "is_sponsor": false
   },
   {
     "id": "mUxV5acpty4",
@@ -1440,7 +1523,9 @@
       "03:16:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11876,
+    "is_sponsor": false
   },
   {
     "id": "lf5VVvUtVhI",
@@ -1471,7 +1556,9 @@
       "02:03:16 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7451,
+    "is_sponsor": false
   },
   {
     "id": "-jti0YBCFr8",
@@ -1507,7 +1594,9 @@
       "03:08:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11379,
+    "is_sponsor": false
   },
   {
     "id": "Wb_0zUW-ouk",
@@ -1541,7 +1630,9 @@
       "03:13:33 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11646,
+    "is_sponsor": false
   },
   {
     "id": "3JnHLAPvw4I",
@@ -1576,7 +1667,9 @@
       "03:21:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12154,
+    "is_sponsor": false
   },
   {
     "id": "tacABBwrRMk",
@@ -1616,7 +1709,9 @@
       "03:09:18 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11418,
+    "is_sponsor": false
   },
   {
     "id": "HXHc5XOK5jE",
@@ -1651,7 +1746,9 @@
       "03:10:09 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11466,
+    "is_sponsor": false
   },
   {
     "id": "k9EtKcBbLPk",
@@ -1689,7 +1786,9 @@
       "03:09:10 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11410,
+    "is_sponsor": false
   },
   {
     "id": "d5V7dr03Gos",
@@ -1722,7 +1821,9 @@
       "03:11:09 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11530,
+    "is_sponsor": false
   },
   {
     "id": "j6LAR60TVUU",
@@ -1757,7 +1858,9 @@
       "03:15:28 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11786,
+    "is_sponsor": false
   },
   {
     "id": "sSYYCbsdAFE",
@@ -1793,7 +1896,9 @@
       "03:11:51 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11565,
+    "is_sponsor": false
   },
   {
     "id": "QUAuaZP4fS0",
@@ -1832,7 +1937,9 @@
       "03:18:43 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11981,
+    "is_sponsor": false
   },
   {
     "id": "zdxSwdHZNNw",
@@ -1869,7 +1976,9 @@
       "03:28:07 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12544,
+    "is_sponsor": false
   },
   {
     "id": "PngAGoKxQnY",
@@ -1903,7 +2012,9 @@
       "03:11:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11559,
+    "is_sponsor": false
   },
   {
     "id": "aostyaqS_KU",
@@ -1933,7 +2044,9 @@
       "03:08:37 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11378,
+    "is_sponsor": false
   },
   {
     "id": "unBHztCHFa0",
@@ -1968,7 +2081,9 @@
       "03:15:57 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11815,
+    "is_sponsor": false
   },
   {
     "id": "WHfivla1j7k",
@@ -2001,7 +2116,9 @@
       "03:19:31 НОВЫЕ Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12026,
+    "is_sponsor": false
   },
   {
     "id": "2IFRmu0aNsc",
@@ -2034,7 +2151,9 @@
       "03:17:52 - 03:19:52  ✨ (2М) Татьяна Куртукова - Матушка 🌍"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12193,
+    "is_sponsor": false
   },
   {
     "id": "me7ipL09Wds",
@@ -2066,7 +2185,9 @@
       "03:00:37 - 03:02:31  ✨ (2М) Александр Бородин - Улетай на крыльях ветра ​​🕊"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11088,
+    "is_sponsor": false
   },
   {
     "id": "i56SkfLd8b0",
@@ -2101,7 +2222,9 @@
       "03:00:26 - 03:02:58  ✨ (2М) Альянс - На заре ☀"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11144,
+    "is_sponsor": false
   },
   {
     "id": "iZP8QQiwj08",
@@ -2135,7 +2258,9 @@
       "03:05:55 - 03:09:14 ✅ (2М) Король и Шут - Кукла колдуна 🔥"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11498,
+    "is_sponsor": false
   },
   {
     "id": "1QTqJFtGOm4",
@@ -2170,7 +2295,9 @@
       "03:17:28 - 03:19:21 ✅ (2М; с П) АИГЕЛ - Пыяла 🔥💔,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12130,
+    "is_sponsor": false
   },
   {
     "id": "lgh9EYHJaCo",
@@ -2199,7 +2326,9 @@
       "02:34:08 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9309,
+    "is_sponsor": false
   },
   {
     "id": "B25A06LCMOg",
@@ -2232,7 +2361,9 @@
       "02:56:58 - 03:00:24 ✅ (2М) Юрий Шатунов - Седая ночь 💧"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10981,
+    "is_sponsor": false
   },
   {
     "id": "VcVKNFteM2s",
@@ -2267,7 +2398,9 @@
       "03:07:46 - 03:12:06 ✅ Альянс - На заре ☀"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11751,
+    "is_sponsor": false
   },
   {
     "id": "b3is5tgBUIo",
@@ -2299,7 +2432,9 @@
       "02:41:19 - 02:43:24 ✨ Король и Шут - Ведьма и осёл 🐐"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9897,
+    "is_sponsor": false
   },
   {
     "id": "wz0mBOIRCD8",
@@ -2333,7 +2468,9 @@
       "02:52:19 - 02:56:24 ✅ Юрий Шатунов - Седая ночь 🌁,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10796,
+    "is_sponsor": false
   },
   {
     "id": "vlZkg2ji5wE",
@@ -2371,7 +2508,9 @@
       "02:44:51 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9948,
+    "is_sponsor": false
   },
   {
     "id": "FCQr2Kuii4A",
@@ -2424,7 +2563,9 @@
       "01:14:11 - 01:14:25 Баста ft. Алена Омаргалиева - Я поднимаюсь над землёй 🕊,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 4521,
+    "is_sponsor": false
   },
   {
     "id": "SloAqgP5ojI",
@@ -2461,7 +2602,9 @@
       "03:08:32 - 03:10:39 ✅ Юрий Шатунов - Седая ночь 🌙,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11578,
+    "is_sponsor": false
   },
   {
     "id": "GK0RrNQAvLY",
@@ -2503,7 +2646,9 @@
       "03:23:50 Розыгрыш 10+ секретных Сигн 🌟"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12378,
+    "is_sponsor": false
   },
   {
     "id": "Wfk-1Q0tcrw",
@@ -2527,7 +2672,9 @@
       "01:42:49 - 01:45:32 ✨ Юрий Шатунов - Седая ночь 🌙,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 6430,
+    "is_sponsor": false
   },
   {
     "id": "6JA8kKvVRsE",
@@ -2563,7 +2710,9 @@
       "03:07:31 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11316,
+    "is_sponsor": false
   },
   {
     "id": "HoJmVQhZ5co",
@@ -2596,7 +2745,9 @@
       "02:08:20 - 02:09:58 ✨ (АВТОРСКАЯ) Квашеная - С любовью из облаков ❤☁ ,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7816,
+    "is_sponsor": false
   },
   {
     "id": "0geRKiNNvLw",
@@ -2613,7 +2764,9 @@
       "00:51:53 - 00:55:13 ✅ Король и Шут - Кукла колдуна 🔥"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 3581,
+    "is_sponsor": false
   },
   {
     "id": "BvMsx-kbWWY",
@@ -2638,7 +2791,9 @@
       "01:41:56 - 01:43:34 ✅ DVN - Можно я с тобой ❤,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 6309,
+    "is_sponsor": false
   },
   {
     "id": "pDQ-Uask7H8",
@@ -2656,7 +2811,9 @@
       "00:58:57 - ... (Стрим внезапно прервался) ✨ Евгения Отрадная - Уходи и дверь закрой 🚪,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 3646,
+    "is_sponsor": false
   },
   {
     "id": "MhXHjW74eSc",
@@ -2696,7 +2853,9 @@
       "02:59:25 - 03:02:45 ✅ Виктор Цой - Группа крови 🔥🩸,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11084,
+    "is_sponsor": false
   },
   {
     "id": "ZMzKN_P0jOU",
@@ -2733,7 +2892,9 @@
       "03:01:24 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10951,
+    "is_sponsor": false
   },
   {
     "id": "9d8LxTPccAU",
@@ -2763,7 +2924,9 @@
       "02:16:07 - 02:18:03 ✅ От винта! (из м/ф \"Смешарики\") ✈🐧,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8402,
+    "is_sponsor": false
   },
   {
     "id": "lYfScV5roow",
@@ -2799,7 +2962,9 @@
       "02:58:39 - 03:00:33 ✅ (с П) АИГЕЛ - Пыяла 🍸❤"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11010,
+    "is_sponsor": false
   },
   {
     "id": "bqinpvjyjio",
@@ -2834,7 +2999,9 @@
       "03:15:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11799,
+    "is_sponsor": false
   },
   {
     "id": "gLMS8lYhBxI",
@@ -2869,7 +3036,9 @@
       "02:53:06 ✅Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10451,
+    "is_sponsor": false
   },
   {
     "id": "LKpPFU89h24",
@@ -2898,7 +3067,9 @@
       "01:59:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7258,
+    "is_sponsor": false
   },
   {
     "id": "kdJUpbTppYM",
@@ -2929,7 +3100,9 @@
       "01:56:35 - 01:58:42 ✅ Форум - Белая ночь 🌙,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7243,
+    "is_sponsor": false
   },
   {
     "id": "QTt2izUxZHc",
@@ -2968,7 +3141,9 @@
       "03:10:51 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11514,
+    "is_sponsor": false
   },
   {
     "id": "iy04F7bfi7M",
@@ -3010,7 +3185,9 @@
       "03:09:18 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11421,
+    "is_sponsor": false
   },
   {
     "id": "7-qffvA2Na0",
@@ -3046,7 +3223,9 @@
       "03:02:40 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11024,
+    "is_sponsor": false
   },
   {
     "id": "NecD8Eamcy8",
@@ -3088,7 +3267,9 @@
       "03:19:18 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12020,
+    "is_sponsor": false
   },
   {
     "id": "AYyeQsOYx-A",
@@ -3120,7 +3301,9 @@
       "01:57:59 - 02:00:03 ✅ (с П) АИГЕЛ - Пыяла 🔥"
     ],
     "list_type": "tracklist",
-    "author": "@mstislav007"
+    "author": "@mstislav007",
+    "duration": 7347,
+    "is_sponsor": false
   },
   {
     "id": "wKKzAbma3JU",
@@ -3156,7 +3339,9 @@
       "02:54:21 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10520,
+    "is_sponsor": false
   },
   {
     "id": "OhDbHVU_aa0",
@@ -3187,7 +3372,9 @@
       "01:58:58 - 02:01:04 ✅ Юрий Шатунов - Седая ночь 😢"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7436,
+    "is_sponsor": false
   },
   {
     "id": "KGyZDc4nBAA",
@@ -3232,7 +3419,9 @@
       "03:33:57 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12899,
+    "is_sponsor": false
   },
   {
     "id": "WiWy0OJkcj4",
@@ -3271,7 +3460,9 @@
       "3:02:00 – Саша – Прощальная импровизация"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 11126,
+    "is_sponsor": false
   },
   {
     "id": "pKQRkzV1V98",
@@ -3299,7 +3490,9 @@
       "01:52:58 - 01:55:43 ✅ Альянс - На заре 🌅"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7144,
+    "is_sponsor": false
   },
   {
     "id": "S8aJhdnmT-o",
@@ -3334,7 +3527,9 @@
       "03:00:47 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10911,
+    "is_sponsor": false
   },
   {
     "id": "n1zJdUR8C9s",
@@ -3363,7 +3558,9 @@
       "02:03:06 - 02:04:56 ✨ (с П) АИГЕЛ - Пыяла 🔥💔"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7571,
+    "is_sponsor": false
   },
   {
     "id": "au9EYhZQSBQ",
@@ -3401,7 +3598,9 @@
       "03:06:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11256,
+    "is_sponsor": false
   },
   {
     "id": "2v9CjpLEl_0",
@@ -3433,7 +3632,9 @@
       "02:29:51 - 02:32:15 ✅ Юрий Энтин, Евгений Крылатов - Прекрасное далеко ❤"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9240,
+    "is_sponsor": false
   },
   {
     "id": "qinSZK7__U0",
@@ -3469,7 +3670,9 @@
       "03:12:39 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11622,
+    "is_sponsor": false
   },
   {
     "id": "jhqZGM4jwTc",
@@ -3493,7 +3696,9 @@
       "01:50:33 - 01:53:57 ✅ Король и Шут - Кукла колдуна 🔥"
     ],
     "list_type": "tracklist",
-    "author": "@humanornot"
+    "author": "@humanornot",
+    "duration": 6985,
+    "is_sponsor": false
   },
   {
     "id": "rl2NZYTa10A",
@@ -3518,7 +3723,9 @@
       "01:56:08 - 01:58:19 ✅ (с П) АИГЕЛ - Пыяла 🔥💔"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 7226,
+    "is_sponsor": false
   },
   {
     "id": "de5Q84kiLFs",
@@ -3548,7 +3755,9 @@
       "03:10:08 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11471,
+    "is_sponsor": false
   },
   {
     "id": "ln5BWSkYBAE",
@@ -3569,7 +3778,9 @@
       "01:21:09 - 01:24:29 ✨ Король и Шут - Кукла колдуна 🔥"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 5293,
+    "is_sponsor": false
   },
   {
     "id": "i3-3RafoklU",
@@ -3601,7 +3812,9 @@
       "03:01:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10935,
+    "is_sponsor": false
   },
   {
     "id": "sp8ts7-9Cto",
@@ -3628,7 +3841,9 @@
       "02:21:03 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8526,
+    "is_sponsor": false
   },
   {
     "id": "opM2ijAMx1g",
@@ -3660,7 +3875,9 @@
       "03:02:16 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10992,
+    "is_sponsor": false
   },
   {
     "id": "kQaHQwRigOw",
@@ -3695,7 +3912,9 @@
       "02:51:09 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10325,
+    "is_sponsor": false
   },
   {
     "id": "HXPZeP5fvjI",
@@ -3729,7 +3948,9 @@
       "03:13:15 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11652,
+    "is_sponsor": false
   },
   {
     "id": "6GWz-YJDMk4",
@@ -3761,7 +3982,9 @@
       "03:15:55 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11817,
+    "is_sponsor": false
   },
   {
     "id": "oaji0cVluNI",
@@ -3797,7 +4020,9 @@
       "03:08:32 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11370,
+    "is_sponsor": false
   },
   {
     "id": "a1HUAt37A0U",
@@ -3829,7 +4054,9 @@
       "03:07:14 (Новинка) Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11291,
+    "is_sponsor": false
   },
   {
     "id": "VFb7bJPoROQ",
@@ -3865,7 +4092,9 @@
       "03:10:03 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11462,
+    "is_sponsor": false
   },
   {
     "id": "_h63GX9lQus",
@@ -3898,7 +4127,9 @@
       "03:10:19 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11476,
+    "is_sponsor": false
   },
   {
     "id": "T9efQOiuMjA",
@@ -3934,7 +4165,9 @@
       "03:27:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12491,
+    "is_sponsor": false
   },
   {
     "id": "shXA9IwjHh0",
@@ -3973,7 +4206,9 @@
       "03:01:32 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10952,
+    "is_sponsor": false
   },
   {
     "id": "r7Yhc9HH3Y8",
@@ -4013,7 +4248,9 @@
       "03:12:08 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11589,
+    "is_sponsor": false
   },
   {
     "id": "GAaQ3SAICz0",
@@ -4051,7 +4288,9 @@
       "03:06:58 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11280,
+    "is_sponsor": false
   },
   {
     "id": "cxjsxaqwjIs",
@@ -4086,7 +4325,9 @@
       "03:15:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11817,
+    "is_sponsor": false
   },
   {
     "id": "RTfqO18zwvA",
@@ -4120,7 +4361,9 @@
       "03:07:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11296,
+    "is_sponsor": false
   },
   {
     "id": "AL7paEFD6xk",
@@ -4155,7 +4398,9 @@
       "03:11:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11580,
+    "is_sponsor": false
   },
   {
     "id": "M0wwqt0PzMo",
@@ -4189,7 +4434,9 @@
       "03:24:50 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12354,
+    "is_sponsor": false
   },
   {
     "id": "SaGEhdtX3FY",
@@ -4220,7 +4467,9 @@
       "03:04:38 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11144,
+    "is_sponsor": false
   },
   {
     "id": "mnHiyt7lNYs",
@@ -4261,7 +4510,9 @@
       "03:04:49 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11146,
+    "is_sponsor": false
   },
   {
     "id": "mGkynxuqUA4",
@@ -4294,7 +4545,9 @@
       "03:04:22 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11126,
+    "is_sponsor": false
   },
   {
     "id": "MMnL38kWObU",
@@ -4335,7 +4588,9 @@
       "03:18:09 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11957,
+    "is_sponsor": false
   },
   {
     "id": "ALAfnla4tms",
@@ -4374,7 +4629,9 @@
       "03:27:32 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12511,
+    "is_sponsor": false
   },
   {
     "id": "g6S3obEiUd8",
@@ -4412,7 +4669,9 @@
       "03:05:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11196,
+    "is_sponsor": false
   },
   {
     "id": "ATyyYJPV66A",
@@ -4448,7 +4707,9 @@
       "03:11:07 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11610,
+    "is_sponsor": false
   },
   {
     "id": "fw1txVd57fA",
@@ -4484,7 +4745,9 @@
       "03:21:37 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@mstislav007"
+    "author": "@mstislav007",
+    "duration": 12152,
+    "is_sponsor": false
   },
   {
     "id": "e5Vqx0Zp9bg",
@@ -4524,7 +4787,9 @@
       "03:11:06 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11535,
+    "is_sponsor": false
   },
   {
     "id": "jt4mlncoL2E",
@@ -4559,7 +4824,9 @@
       "03:15:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11810,
+    "is_sponsor": false
   },
   {
     "id": "qB1pCVJGnRM",
@@ -4599,7 +4866,9 @@
       "03:12:24 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11606,
+    "is_sponsor": false
   },
   {
     "id": "CYDDXzmhBno",
@@ -4640,7 +4909,9 @@
       "03:14:48 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11746,
+    "is_sponsor": false
   },
   {
     "id": "UzAtfjzbirs",
@@ -4682,7 +4953,9 @@
       "03:10:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11492,
+    "is_sponsor": false
   },
   {
     "id": "nM3-qjTEoh4",
@@ -4721,7 +4994,9 @@
       "03:12:05 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11588,
+    "is_sponsor": false
   },
   {
     "id": "ijiWrfL2Igo",
@@ -4754,7 +5029,9 @@
       "3:18:23 - Ты как-то мне рассказал (Саша Квашеная)"
     ],
     "list_type": "tracklist",
-    "author": "@Глазурь"
+    "author": "@Глазурь",
+    "duration": 12183,
+    "is_sponsor": false
   },
   {
     "id": "Fy5QX68dMnw",
@@ -4788,7 +5065,9 @@
       "02:37:10 Обновлённые титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9488,
+    "is_sponsor": false
   },
   {
     "id": "yI1aAacuThc",
@@ -4829,7 +5108,9 @@
       "03:19:37 Титры 📜"
     ],
     "list_type": "tracklist",
-    "author": "@humanornot"
+    "author": "@humanornot",
+    "duration": 12036,
+    "is_sponsor": false
   },
   {
     "id": "3VuYBcAj7Rk",
@@ -4869,7 +5150,9 @@
       "02:34:29 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9324,
+    "is_sponsor": false
   },
   {
     "id": "7f4IbtWSj_4",
@@ -4907,7 +5190,9 @@
       "03:37:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13122,
+    "is_sponsor": false
   },
   {
     "id": "ez6gfee6Lic",
@@ -4944,7 +5229,9 @@
       "03:25:52 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12467,
+    "is_sponsor": false
   },
   {
     "id": "g6fksyvZiTA",
@@ -4975,7 +5262,9 @@
       "03:12:55 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@Евген54"
+    "author": "@Евген54",
+    "duration": 11635,
+    "is_sponsor": false
   },
   {
     "id": "yLdAz3VdNTc",
@@ -5011,7 +5300,9 @@
       "03:09:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11458,
+    "is_sponsor": false
   },
   {
     "id": "JAv8LIktQz0",
@@ -5046,7 +5337,9 @@
       "03:17:48 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@mstislav007"
+    "author": "@mstislav007",
+    "duration": 11946,
+    "is_sponsor": false
   },
   {
     "id": "0HXQS7NWQfg",
@@ -5081,7 +5374,9 @@
       "03:16:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11877,
+    "is_sponsor": false
   },
   {
     "id": "T4iS2WCv8pk",
@@ -5117,7 +5412,9 @@
       "03:13:59 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11702,
+    "is_sponsor": false
   },
   {
     "id": "fa9feFeiX5U",
@@ -5151,7 +5448,9 @@
       "03:15:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11798,
+    "is_sponsor": false
   },
   {
     "id": "zkW0gg_Xa5c",
@@ -5184,7 +5483,9 @@
       "03:06:02 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11220,
+    "is_sponsor": false
   },
   {
     "id": "67xTG0uQ_Kk",
@@ -5247,7 +5548,9 @@
       "03:08:23 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11365,
+    "is_sponsor": false
   },
   {
     "id": "ra1h60oBUzs",
@@ -5283,7 +5586,9 @@
       "03:10:37 Заключительная песня Стрима: Евгений Крылатов, Юрий Яковлев - Колыбельная медведицы 🌌🐻‍❄"
     ],
     "list_type": "tracklist",
-    "author": "@Hrom134-u7c"
+    "author": "@Hrom134-u7c",
+    "duration": 11699,
+    "is_sponsor": false
   },
   {
     "id": "TkSqs6mLKPw",
@@ -5318,7 +5623,9 @@
       "03:12:32 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11611,
+    "is_sponsor": false
   },
   {
     "id": "uq1YOC-BmQg",
@@ -5354,7 +5661,9 @@
       "03:19:37 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12050,
+    "is_sponsor": false
   },
   {
     "id": "80-DPWrWrg8",
@@ -5394,7 +5703,9 @@
       "03:20:54 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12122,
+    "is_sponsor": false
   },
   {
     "id": "vrRj39Xv8ig",
@@ -5433,7 +5744,9 @@
       "03:06:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11271,
+    "is_sponsor": false
   },
   {
     "id": "OG3ZzuIVSjs",
@@ -5469,7 +5782,9 @@
       "03:14:00 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11700,
+    "is_sponsor": false
   },
   {
     "id": "b5o7DKu4HfM",
@@ -5506,7 +5821,9 @@
       "03:16:28 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11852,
+    "is_sponsor": false
   },
   {
     "id": "h6K_znkNCVE",
@@ -5539,7 +5856,9 @@
       "03:02:17 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10993,
+    "is_sponsor": false
   },
   {
     "id": "WC462kH8kVo",
@@ -5582,7 +5901,9 @@
       "03:16:01 Розыгрыш 7 Сигн"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11566,
+    "is_sponsor": false
   },
   {
     "id": "z2Um145IirA",
@@ -5625,7 +5946,9 @@
       "03:21:47 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12168,
+    "is_sponsor": false
   },
   {
     "id": "P3VBwMwrW6U",
@@ -5665,7 +5988,9 @@
       "02:57:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10691,
+    "is_sponsor": false
   },
   {
     "id": "y0MugnjqktI",
@@ -5704,7 +6029,9 @@
       "03:09:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11441,
+    "is_sponsor": false
   },
   {
     "id": "0zQNPQKNCM0",
@@ -5742,7 +6069,9 @@
       "03:06:47 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11268,
+    "is_sponsor": false
   },
   {
     "id": "t2gB0J1atoM",
@@ -5787,7 +6116,9 @@
       "03:19:39 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12041,
+    "is_sponsor": false
   },
   {
     "id": "LXt0W1UM8vI",
@@ -5830,7 +6161,9 @@
       "03:22:56 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12230,
+    "is_sponsor": false
   },
   {
     "id": "ocT9T5cHlU8",
@@ -5871,7 +6204,9 @@
       "03:02:40 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11022,
+    "is_sponsor": false
   },
   {
     "id": "sBmAO-RykLk",
@@ -5911,7 +6246,9 @@
       "03:15:42 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11801,
+    "is_sponsor": false
   },
   {
     "id": "4J1XNm9blmw",
@@ -5952,7 +6289,9 @@
       "03:26:14 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12430,
+    "is_sponsor": false
   },
   {
     "id": "PVZZuBfX9v0",
@@ -5997,7 +6336,9 @@
       "03:24:06 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12307,
+    "is_sponsor": false
   },
   {
     "id": "8GOvG02qOtI",
@@ -6037,7 +6378,9 @@
       "03:27:49 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12528,
+    "is_sponsor": false
   },
   {
     "id": "9qOaYN0lqaI",
@@ -6077,7 +6420,9 @@
       "03:10:21 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11480,
+    "is_sponsor": false
   },
   {
     "id": "Olxv_onXxQo",
@@ -6115,7 +6460,9 @@
       "03:18:45 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11983,
+    "is_sponsor": false
   },
   {
     "id": "yYPi6oKn7z0",
@@ -6156,7 +6503,9 @@
       "03:30:44 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12710,
+    "is_sponsor": false
   },
   {
     "id": "msW0u4T7x7Q",
@@ -6201,7 +6550,9 @@
       "03:32:09 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12788,
+    "is_sponsor": false
   },
   {
     "id": "sSZY7gIDbVg",
@@ -6242,7 +6593,9 @@
       "03:21:55 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12175,
+    "is_sponsor": false
   },
   {
     "id": "rKDfAR99Cfg",
@@ -6290,7 +6643,9 @@
       "03:38:39 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13181,
+    "is_sponsor": false
   },
   {
     "id": "4sWCjcT6LqQ",
@@ -6330,7 +6685,9 @@
       "03:19:34 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12034,
+    "is_sponsor": false
   },
   {
     "id": "znSh43Irtoc",
@@ -6370,7 +6727,9 @@
       "03:27:48 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12527,
+    "is_sponsor": false
   },
   {
     "id": "Ic9bdtehgk8",
@@ -6410,7 +6769,9 @@
       "03:17:46 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11930,
+    "is_sponsor": false
   },
   {
     "id": "WsYV4TZcvKw",
@@ -6449,7 +6810,9 @@
       "03:24:44 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12347,
+    "is_sponsor": false
   },
   {
     "id": "byc7RJPN5MM",
@@ -6489,7 +6852,9 @@
       "03:23:02 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12247,
+    "is_sponsor": false
   },
   {
     "id": "ETWoX3hAEMg",
@@ -6533,7 +6898,9 @@
       "03:43:40 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13483,
+    "is_sponsor": false
   },
   {
     "id": "g9GGoJuMw_U",
@@ -6578,7 +6945,9 @@
       "03:25:10 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12372,
+    "is_sponsor": false
   },
   {
     "id": "jSUAgHk26ms",
@@ -6620,7 +6989,9 @@
       "03:32:35 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12817,
+    "is_sponsor": false
   },
   {
     "id": "xdzMQyNrLFw",
@@ -6636,7 +7007,7 @@
       "00:40:13 t.A.T.u. - Я сошла с ума 🔥",
       "00:51:00 Порнофильмы - Я так соскучился 🔥",
       "01:01:34 Бумбокс - Вахтёрам 💔",
-      "01:10:54 Игорь Корнелюк - Город, которого нет 💔",
+      "01:01:54 Игорь Корнелюк - Город, которого нет 💔",
       "01:17:30 Асия - Ну чё ты такой хороший? 🔥",
       "01:28:40 Мумий Тролль - Медведица 🐻✨",
       "01:34:54 Квашеная - Сомнения 🔥",
@@ -6661,7 +7032,9 @@
       "03:37:10 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13086,
+    "is_sponsor": false
   },
   {
     "id": "pZJEnkcV1PQ",
@@ -6703,7 +7076,9 @@
       "03:35:23 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12984,
+    "is_sponsor": false
   },
   {
     "id": "r-hJzlaFGLE",
@@ -6743,7 +7118,9 @@
       "03:27:53 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12535,
+    "is_sponsor": false
   },
   {
     "id": "c-5JOyqRoDM",
@@ -6800,7 +7177,9 @@
       "03:30:03 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12671,
+    "is_sponsor": false
   },
   {
     "id": "i6pwiTliq7A",
@@ -6838,7 +7217,9 @@
       "03:23:33 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12277,
+    "is_sponsor": false
   },
   {
     "id": "PiOq_NpefPo",
@@ -6881,7 +7262,9 @@
       "03:33:46 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12886,
+    "is_sponsor": false
   },
   {
     "id": "jDRP5r3uQ4s",
@@ -6924,7 +7307,9 @@
       "03:27:11 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12492,
+    "is_sponsor": false
   },
   {
     "id": "ZtBnLjXJDeU",
@@ -6964,7 +7349,9 @@
       "03:19:22 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12034,
+    "is_sponsor": false
   },
   {
     "id": "OE8cFcwXQco",
@@ -7004,7 +7391,9 @@
       "03:26:39 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12458,
+    "is_sponsor": false
   },
   {
     "id": "KyZFKv_mLAA",
@@ -7043,7 +7432,9 @@
       "03:24:47 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12340,
+    "is_sponsor": false
   },
   {
     "id": "XTujXDOLaCM",
@@ -7081,7 +7472,9 @@
       "03:24:21 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12325,
+    "is_sponsor": false
   },
   {
     "id": "4iU2fjzdMAM",
@@ -7126,7 +7519,9 @@
       "03:35:26 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12877,
+    "is_sponsor": false
   },
   {
     "id": "lbMGmn_VhF0",
@@ -7169,7 +7564,9 @@
       "03:35:26 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12989,
+    "is_sponsor": false
   },
   {
     "id": "cX6JigFKzsw",
@@ -7208,7 +7605,9 @@
       "03:09:29 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11427,
+    "is_sponsor": false
   },
   {
     "id": "gJm4W-aP0iU",
@@ -7247,7 +7646,9 @@
       "03:29:18 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12617,
+    "is_sponsor": false
   },
   {
     "id": "SE53dI0678g",
@@ -7286,7 +7687,9 @@
       "03:35:48 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13014,
+    "is_sponsor": false
   },
   {
     "id": "2S_srJSt2n4",
@@ -7329,7 +7732,9 @@
       "03:39:39 Титры,"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13249,
+    "is_sponsor": false
   },
   {
     "id": "sI54VG-vpUY",
@@ -7366,7 +7771,9 @@
       "02:59:44 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10842,
+    "is_sponsor": false
   },
   {
     "id": "-VFYB_sSQmU",
@@ -7386,7 +7793,9 @@
       "01:23:49 (2М) МакSим - Лучшая ночь 💗"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 5115,
+    "is_sponsor": false
   },
   {
     "id": "34MeLe85XdI",
@@ -7435,7 +7844,9 @@
       "04:02:41 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sv_windsunny"
+    "author": "@sv_windsunny",
+    "duration": 14626,
+    "is_sponsor": false
   },
   {
     "id": "nQ7N3iF3o3c",
@@ -7475,7 +7886,9 @@
       "02:18:24 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 8360,
+    "is_sponsor": false
   },
   {
     "id": "6By8XbsVzcE",
@@ -7516,7 +7929,9 @@
       "03:27:17 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12503,
+    "is_sponsor": false
   },
   {
     "id": "D9qgBZl2yAs",
@@ -7555,7 +7970,9 @@
       "03:31:36 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12756,
+    "is_sponsor": false
   },
   {
     "id": "rR5UlhR7GyA",
@@ -7594,7 +8011,9 @@
       "03:31:22 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12743,
+    "is_sponsor": false
   },
   {
     "id": "W5hP4yS1HKw",
@@ -7627,7 +8046,9 @@
       "03:22:31 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12215,
+    "is_sponsor": false
   },
   {
     "id": "XmnMGvzY5JY",
@@ -7665,7 +8086,9 @@
       "03:39:17 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13213,
+    "is_sponsor": false
   },
   {
     "id": "W3ulsU9dud8",
@@ -7704,7 +8127,9 @@
       "03:39:05 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13205,
+    "is_sponsor": false
   },
   {
     "id": "w7eylYrzdNU",
@@ -7744,7 +8169,9 @@
       "03:41:54 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13378,
+    "is_sponsor": false
   },
   {
     "id": "CvE3ien9REQ",
@@ -7787,7 +8214,9 @@
       "03:34:08 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12905,
+    "is_sponsor": false
   },
   {
     "id": "pgwm4A9pNEg",
@@ -7824,7 +8253,9 @@
       "03:21:12 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12127,
+    "is_sponsor": false
   },
   {
     "id": "voInauVTxLs",
@@ -7865,7 +8296,9 @@
       "03:32:56 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12836,
+    "is_sponsor": false
   },
   {
     "id": "BiLWgK4l4yk",
@@ -7901,7 +8334,9 @@
       "03:24:53 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12356,
+    "is_sponsor": false
   },
   {
     "id": "_d-X8SioltA",
@@ -7935,7 +8370,9 @@
       "02:50:59 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10318,
+    "is_sponsor": false
   },
   {
     "id": "JNggKUkAD20",
@@ -7975,7 +8412,9 @@
       "03:28:24 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12561,
+    "is_sponsor": false
   },
   {
     "id": "vFcsQMO_yog",
@@ -8014,7 +8453,9 @@
       "03:28:41 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12584,
+    "is_sponsor": false
   },
   {
     "id": "11Lr7GSPAlU",
@@ -8053,7 +8494,9 @@
       "03:36:57 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13075,
+    "is_sponsor": false
   },
   {
     "id": "AM6JwGj1wAE",
@@ -8087,7 +8530,9 @@
       "03:28:29 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12574,
+    "is_sponsor": false
   },
   {
     "id": "aowF-rnXjL8",
@@ -8124,7 +8569,9 @@
       "03:29:05 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12604,
+    "is_sponsor": false
   },
   {
     "id": "Do6X8uac_kw",
@@ -8159,7 +8606,9 @@
       "03:35:31 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12994,
+    "is_sponsor": false
   },
   {
     "id": "S64vMHeZ7Uc",
@@ -8198,7 +8647,9 @@
       "03:33:48 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12891,
+    "is_sponsor": false
   },
   {
     "id": "8t3qYx43qTI",
@@ -8236,7 +8687,9 @@
       "03:35:58 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13027,
+    "is_sponsor": false
   },
   {
     "id": "S9r2Sqr4kGg",
@@ -8274,7 +8727,9 @@
       "03:43:54 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13498,
+    "is_sponsor": false
   },
   {
     "id": "-OgLY4kBOgs",
@@ -8314,7 +8769,9 @@
       "03:38:15 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13182,
+    "is_sponsor": false
   },
   {
     "id": "S3eQJ4io7CA",
@@ -8347,7 +8804,9 @@
       "03:22:56 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12237,
+    "is_sponsor": false
   },
   {
     "id": "GB0lHp9wXdc",
@@ -8387,7 +8846,9 @@
       "03:38:10 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13147,
+    "is_sponsor": false
   },
   {
     "id": "UugdGi5y9n8",
@@ -8422,7 +8883,9 @@
       "03:25:46 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12401,
+    "is_sponsor": false
   },
   {
     "id": "h4PXhfCQrWo",
@@ -8469,7 +8932,9 @@
       "03:11:00 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11520,
+    "is_sponsor": false
   },
   {
     "id": "OKqVyklpEoA",
@@ -8497,7 +8962,9 @@
       "3:31:23 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12745,
+    "is_sponsor": false
   },
   {
     "id": "KnILuONnuqc",
@@ -8530,7 +8997,9 @@
       "3:27:40 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12530,
+    "is_sponsor": false
   },
   {
     "id": "gkKrTGvc-9A",
@@ -8564,7 +9033,9 @@
       "03:01:58 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10980,
+    "is_sponsor": false
   },
   {
     "id": "hOt0U3lTGag",
@@ -8597,7 +9068,9 @@
       "03:19:12 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12017,
+    "is_sponsor": false
   },
   {
     "id": "P5d_DbidbqA",
@@ -8622,7 +9095,9 @@
       "3:32:40 — Группа Добро — «Юность»"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 13347,
+    "is_sponsor": false
   },
   {
     "id": "eExbx5Jqu1o",
@@ -8655,7 +9130,9 @@
       "03:14:46 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11752,
+    "is_sponsor": false
   },
   {
     "id": "HAEzHfIIyUM",
@@ -8687,7 +9164,9 @@
       "03:01:21 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 10955,
+    "is_sponsor": false
   },
   {
     "id": "0UsTVrlZqSg",
@@ -8734,7 +9213,9 @@
       "03:40:39 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13318,
+    "is_sponsor": false
   },
   {
     "id": "G3aFikUalTc",
@@ -8771,7 +9252,9 @@
       "03:20:47 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12109,
+    "is_sponsor": false
   },
   {
     "id": "5a61t-VR8GE",
@@ -8808,7 +9291,9 @@
       "03:28:41 Е.Крылатов, Ю.Яковлев - Колыбельная медведицы"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12788,
+    "is_sponsor": false
   },
   {
     "id": "XO8dxW97DpE",
@@ -8846,7 +9331,9 @@
       "3:16:16 – Колыбельная медведицы (финальная)"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12010,
+    "is_sponsor": false
   },
   {
     "id": "ZdT72mrN-rg",
@@ -8872,7 +9359,9 @@
       "2:13:09 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 8052,
+    "is_sponsor": false
   },
   {
     "id": "9A9YrimVrEs",
@@ -8901,7 +9390,9 @@
       "3:31:31 - Колыбельная Умки"
     ],
     "list_type": "tracklist",
-    "author": "@StarBear654"
+    "author": "@StarBear654",
+    "duration": 12972,
+    "is_sponsor": false
   },
   {
     "id": "aRw1-CoR8S0",
@@ -8935,7 +9426,8 @@
     ],
     "list_type": "tracklist",
     "author": "@stepan-b4b4o",
-    "duration": 12835
+    "duration": 12835,
+    "is_sponsor": false
   },
   {
     "id": "03w9nSjXJwo",
@@ -8974,7 +9466,9 @@
       "03:38:20 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13163,
+    "is_sponsor": false
   },
   {
     "id": "igWEU7fHqfA",
@@ -8999,7 +9493,9 @@
       "3:26:38 Саша Квашеная — Колыбельная умки"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12633,
+    "is_sponsor": false
   },
   {
     "id": "ojo45UF6HmM",
@@ -9034,7 +9530,9 @@
       "03:34:26 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12935,
+    "is_sponsor": false
   },
   {
     "id": "yh8sZG-P_bU",
@@ -9077,7 +9575,9 @@
       "03:30:19 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12684,
+    "is_sponsor": false
   },
   {
     "id": "HP3fsBboR-k",
@@ -9114,7 +9614,9 @@
       "03:31:15 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12737,
+    "is_sponsor": false
   },
   {
     "id": "3OLFB8vgELA",
@@ -9146,7 +9648,9 @@
       "03:39:05 Титры + песня Квашеная - Вот и закончился стрим"
     ],
     "list_type": "tracklist",
-    "author": "@Victoria-sk8fd"
+    "author": "@Victoria-sk8fd",
+    "duration": 13208,
+    "is_sponsor": false
   },
   {
     "id": "ntM2dLL4WLg",
@@ -9176,7 +9680,9 @@
       "3:30:29 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12707,
+    "is_sponsor": false
   },
   {
     "id": "Vu3jRvwoGQM",
@@ -9207,7 +9713,9 @@
       "03:32:26 - Е.Крылатов, Ю.Яковлев - Колыбельная медведицы"
     ],
     "list_type": "tracklist",
-    "author": "@pacak0r"
+    "author": "@pacak0r",
+    "duration": 13048,
+    "is_sponsor": false
   },
   {
     "id": "NAlAuh9tt14",
@@ -9222,7 +9730,9 @@
       "2:16:34   Альянс - На заре"
     ],
     "list_type": "tracklist",
-    "author": "@LiSTENiN6"
+    "author": "@LiSTENiN6",
+    "duration": 12929,
+    "is_sponsor": false
   },
   {
     "id": "CuiYkyA79kc",
@@ -9257,7 +9767,9 @@
       "03:30:58 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12737,
+    "is_sponsor": false
   },
   {
     "id": "N9cMZuMT_rE",
@@ -9296,7 +9808,9 @@
       "03:48:02 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13746,
+    "is_sponsor": false
   },
   {
     "id": "YDsjIK8Mcl0",
@@ -9329,7 +9843,9 @@
       "4:04:30 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 14734,
+    "is_sponsor": false
   },
   {
     "id": "Xut7RwZ7j_Q",
@@ -9367,7 +9883,9 @@
       "03:37:49 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13133,
+    "is_sponsor": false
   },
   {
     "id": "7veWGLkLuMA",
@@ -9407,7 +9925,9 @@
       "03:29:43 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12647,
+    "is_sponsor": false
   },
   {
     "id": "oVwQdhKy9E8",
@@ -9441,7 +9961,9 @@
       "03:30:57 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12729,
+    "is_sponsor": false
   },
   {
     "id": "K_PpOtsy5ak",
@@ -9482,7 +10004,9 @@
       "03:40:46 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13312,
+    "is_sponsor": false
   },
   {
     "id": "WXLPiBSniJU",
@@ -9514,7 +10038,9 @@
       "03:46:55 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@kvasharchiv"
+    "author": "@kvasharchiv",
+    "duration": 13680,
+    "is_sponsor": false
   },
   {
     "id": "CXpTpbhbkMU",
@@ -9549,7 +10075,9 @@
       "03:40:36 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@kvasharchiv"
+    "author": "@kvasharchiv",
+    "duration": 13299,
+    "is_sponsor": false
   },
   {
     "id": "uQPU271ZvOI",
@@ -9586,7 +10114,9 @@
       "03:38:28 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13180,
+    "is_sponsor": false
   },
   {
     "id": "aqyQZwGHFWc",
@@ -9625,7 +10155,9 @@
       "3:28:00 (Г) Колыбельная Умки"
     ],
     "list_type": "tracklist",
-    "author": "@Ge0graph"
+    "author": "@Ge0graph",
+    "duration": 12717,
+    "is_sponsor": false
   },
   {
     "id": "_8GPVxRsxZE",
@@ -9662,7 +10194,9 @@
       "03:37:23 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13115,
+    "is_sponsor": false
   },
   {
     "id": "kUJU_k-xkgA",
@@ -9705,7 +10239,9 @@
       "1:45:48 СПАСИБО БОЛЬШОЕ ВСЕМ"
     ],
     "list_type": "tracklist",
-    "author": "@Vzbdrl"
+    "author": "@Vzbdrl",
+    "duration": 6399,
+    "is_sponsor": false
   },
   {
     "id": "GVq1bTrBn1w",
@@ -9752,7 +10288,9 @@
       "03:32:35 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12815,
+    "is_sponsor": false
   },
   {
     "id": "sw0JO-6WK0Q",
@@ -9797,7 +10335,9 @@
       "03:37:35 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13117,
+    "is_sponsor": false
   },
   {
     "id": "8Q4WQQKjBMk",
@@ -9853,7 +10393,9 @@
       "03:30:29 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12692,
+    "is_sponsor": false
   },
   {
     "id": "QvxWBBMhnHo",
@@ -9888,7 +10430,9 @@
       "03:45:53 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13618,
+    "is_sponsor": false
   },
   {
     "id": "e3PmDaWAAiM",
@@ -9921,7 +10465,9 @@
       "03:40:23 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13292,
+    "is_sponsor": false
   },
   {
     "id": "paHCwjrWi-Q",
@@ -9936,7 +10482,9 @@
       "2:11:26 - Младший лейтенант"
     ],
     "list_type": "tracklist",
-    "author": "@film_cut0"
+    "author": "@film_cut0",
+    "duration": 12675,
+    "is_sponsor": false
   },
   {
     "id": "EBYjwCHka6A",
@@ -9973,7 +10521,9 @@
       "03:35:44 Титры ❤"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13007,
+    "is_sponsor": false
   },
   {
     "id": "H31-SKBQOco",
@@ -10008,7 +10558,9 @@
       "03:33:51 - Е.Крылатов, Ю.Яковлев - Колыбельная медведицы"
     ],
     "list_type": "tracklist",
-    "author": "@pacak0r"
+    "author": "@pacak0r",
+    "duration": 13194,
+    "is_sponsor": false
   },
   {
     "id": "QuazEP01ppw",
@@ -10038,7 +10590,9 @@
       "02:31:27 Титры ❤"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 9157,
+    "is_sponsor": false
   },
   {
     "id": "spJFZycJIs4",
@@ -10059,7 +10613,9 @@
       "3:26:58 — Евгений Крылатов / Юрий Яковлев — «Колыбельная медведицы»"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12735,
+    "is_sponsor": false
   },
   {
     "id": "NBjmAI14Vps",
@@ -10081,7 +10637,9 @@
       "3:34:52 — Авторская - Колыбельная"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 13147,
+    "is_sponsor": false
   },
   {
     "id": "aXOLYo-6S-4",
@@ -10114,7 +10672,9 @@
       "3:24:46 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12355,
+    "is_sponsor": false
   },
   {
     "id": "nQsIGq7RaXw",
@@ -10131,7 +10691,9 @@
       "1:34:59 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 5773,
+    "is_sponsor": false
   },
   {
     "id": "BacqqjGyq0k",
@@ -10163,7 +10725,9 @@
       "3:54:00 – Колыбельная медведицы (из м/ф «Умка»)"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 14508,
+    "is_sponsor": false
   },
   {
     "id": "0aL2tROvlZg",
@@ -10198,7 +10762,9 @@
       "03:24:29 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12336,
+    "is_sponsor": false
   },
   {
     "id": "9UxULIMWe-0",
@@ -10235,7 +10801,9 @@
       "03:36:07 Евгений Крылатов, Юрий Яковлев - Колыбельная Медведицы (м/ф \"Умка\")"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13269,
+    "is_sponsor": false
   },
   {
     "id": "fGyYgLhP988",
@@ -10266,7 +10834,9 @@
       "03:32:39 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12827,
+    "is_sponsor": false
   },
   {
     "id": "2kD_Op44kzQ",
@@ -10296,7 +10866,9 @@
       "03:36:29 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13050,
+    "is_sponsor": false
   },
   {
     "id": "Lbo5bNzbxK8",
@@ -10331,7 +10903,9 @@
       "04:00:55 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 14526,
+    "is_sponsor": false
   },
   {
     "id": "S_baVmhP4TI",
@@ -10362,7 +10936,9 @@
       "03:33:52 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@kvasharchiv"
+    "author": "@kvasharchiv",
+    "duration": 12893,
+    "is_sponsor": false
   },
   {
     "id": "fn7RbqDyEwQ",
@@ -10391,7 +10967,9 @@
       "3:31:13 Колыбельная медведицы."
     ],
     "list_type": "tracklist",
-    "author": "@Piro_"
+    "author": "@Piro_",
+    "duration": 13007,
+    "is_sponsor": false
   },
   {
     "id": "DdmkUGIEsy8",
@@ -10423,7 +11001,9 @@
       "03:23:58 Евгений Крылатов, Юрий Яковлев - Колыбельная Медведицы (Умки)"
     ],
     "list_type": "tracklist",
-    "author": "@kvasharchiv"
+    "author": "@kvasharchiv",
+    "duration": 12475,
+    "is_sponsor": false
   },
   {
     "id": "cnthgfcNBgI",
@@ -10449,7 +11029,9 @@
       "3:40:42 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 13329,
+    "is_sponsor": false
   },
   {
     "id": "r_XyqxOYmik",
@@ -10480,7 +11062,9 @@
       "2:52:17 финальная  \"Колыбельная Медведицы\" (Колыбельная Умки, музыка Евгений Крылатов, текст Юрий Яковлев)"
     ],
     "list_type": "tracklist",
-    "author": "@Ингварръ"
+    "author": "@Ингварръ",
+    "duration": 10608,
+    "is_sponsor": false
   },
   {
     "id": "4YBpDRTSp9M",
@@ -10501,7 +11085,9 @@
       "01:17:30  Е.Крылатов, Ю.Яковлев - Колыбельная медведицы"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 5047,
+    "is_sponsor": false
   },
   {
     "id": "8TzVbCEix7M",
@@ -10534,7 +11120,9 @@
       "3:43:47 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 13499,
+    "is_sponsor": false
   },
   {
     "id": "yFl_y5JlKX4",
@@ -10568,7 +11156,9 @@
       "03:17:57 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 11945,
+    "is_sponsor": false
   },
   {
     "id": "k101MkWNJUU",
@@ -10595,7 +11185,9 @@
       "4:24:32 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 15939,
+    "is_sponsor": false
   },
   {
     "id": "wX000WoatGs",
@@ -10631,7 +11223,9 @@
       "3:53:28 конец) 🌌"
     ],
     "list_type": "tracklist",
-    "author": "@ajoajo701"
+    "author": "@ajoajo701",
+    "duration": 14079,
+    "is_sponsor": false
   },
   {
     "id": "hFHYcgI7Prc",
@@ -10666,7 +11260,9 @@
       "03:15:03 Заключительная песня стрима (Евгений Крылатов, Юрий Яковлев - Колыбельная Медведицы (Колыбельная Умки)) 03:20:16 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12080,
+    "is_sponsor": false
   },
   {
     "id": "84W2dGVBgvk",
@@ -10696,7 +11292,8 @@
     ],
     "list_type": "tracklist",
     "author": "@stepan-b4b4o",
-    "duration": 8959
+    "duration": 8959,
+    "is_sponsor": false
   },
   {
     "id": "RiDZVTYCPhg",
@@ -10728,7 +11325,9 @@
       "04:04:21 Титры с песней \"Вот и закончился стрим...\""
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 14723,
+    "is_sponsor": false
   },
   {
     "id": "4gu6WWgXImM",
@@ -10758,7 +11357,9 @@
       "03:40:18 Титры с песней \"Вот и закончился стрим...\""
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 13282,
+    "is_sponsor": false
   },
   {
     "id": "miEUSlUvaPg",
@@ -10771,8 +11372,9 @@
       "2:10:45 - контрольный тихоном в голову"
     ],
     "list_type": "mixed",
-    "author": "@kuzmin1375, @Ингварръ",
-    "duration": 12112
+    "author": "@Ингварръ, @kuzmin1375",
+    "duration": 12112,
+    "is_sponsor": false
   },
   {
     "id": "3DpMf6ptsZw",
@@ -10803,7 +11405,9 @@
       "3:45:07 – Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 13573,
+    "is_sponsor": false
   },
   {
     "id": "UOeR29ThFGw",
@@ -10815,8 +11419,9 @@
       "2:04:15 и дальше)) Даша просто молодец, причем видно, что даже не выкладывалась!!!"
     ],
     "list_type": "mixed",
-    "author": "@ВолодимирВасиленко1, @shungan1288, @ВладимирИванов-и7ч7и и др.",
-    "duration": 12271
+    "author": "@ajoajo701, @shungan1288, @LumBMM и др.",
+    "duration": 12271,
+    "is_sponsor": false
   },
   {
     "id": "6kI5Y0T4pE8",
@@ -10849,7 +11454,9 @@
       "03:26:31 Заключительная песня стрима (НОВАЯ Колыбельная, в основе лежит Колыбельная Медведицы) (А) 💤🌌🌠 03:30:18 Титры"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12677,
+    "is_sponsor": false
   },
   {
     "id": "6uk_Hy_mqZc",
@@ -10877,7 +11484,9 @@
       "3:33:42   Саша – Финальная прощальная песенка"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 12881,
+    "is_sponsor": false
   },
   {
     "id": "ld9Vr4ztBfk",
@@ -10908,7 +11517,9 @@
       "03:54:07 Заключительная песня (Колыбельная медведицы (Колыбельная Умки) под звуки дождика)"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 14563,
+    "is_sponsor": false
   },
   {
     "id": "jGswTYwStUo",
@@ -10935,7 +11546,9 @@
       "🕗02:18:53 🕙Завершение и слова напутствия☑"
     ],
     "list_type": "tracklist",
-    "author": "@ВасилекПечорский"
+    "author": "@ВасилекПечорский",
+    "duration": 8414,
+    "is_sponsor": false
   },
   {
     "id": "RZ421i4BJbs",
@@ -10970,7 +11583,9 @@
       "03:47:21 Заключительная песня Колыбельная медведица для Умки"
     ],
     "list_type": "tracklist",
-    "author": "@Piro_"
+    "author": "@Piro_",
+    "duration": 13843,
+    "is_sponsor": false
   },
   {
     "id": "LyGOU6-S7Ag",
@@ -11004,7 +11619,9 @@
       "2:40:31 – Колыбельная медведицы (из м/ф «Умка»)"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 9812,
+    "is_sponsor": false
   },
   {
     "id": "Ul5p9vU7QdM",
@@ -11019,8 +11636,9 @@
       "02:48:36 МакSим-Знаешь ли ты"
     ],
     "list_type": "mixed",
-    "author": "@yozhikhyper1337, @Df-dv1ss, @ajoajo701 и др.",
-    "duration": 10994
+    "author": "@ajoajo701, @Df-dv1ss, @anastasia_drawyt108 и др.",
+    "duration": 10994,
+    "is_sponsor": false
   },
   {
     "id": "Vp-hDB9UDDM",
@@ -11050,7 +11668,9 @@
       "03:15:46 Мураками - Сжигай мосты"
     ],
     "list_type": "tracklist",
-    "author": "@sandrrrr"
+    "author": "@sandrrrr",
+    "duration": 12040,
+    "is_sponsor": false
   },
   {
     "id": "us4t6nCcfoo",
@@ -11080,7 +11700,9 @@
       "2:35:52 – Колыбельная медведицы (из м/ф «Умка»)"
     ],
     "list_type": "tracklist",
-    "author": "@stepan-b4b4o"
+    "author": "@stepan-b4b4o",
+    "duration": 9553,
+    "is_sponsor": false
   },
   {
     "id": "vq3ZA9Jq21I",
@@ -11116,7 +11738,9 @@
       "3:47:57 Евгений Крылатов, Юрий Яковлев - Колыбельная медведицы (а капелла)"
     ],
     "list_type": "tracklist",
-    "author": "@abhavarius"
+    "author": "@abhavarius",
+    "duration": 14032,
+    "is_sponsor": false
   },
   {
     "id": "NCKEaPDIYPE",
@@ -11154,7 +11778,9 @@
       "03:45:40 -  Колыбельная от квашули"
     ],
     "list_type": "tracklist",
-    "author": "@kvasharchiv"
+    "author": "@kvasharchiv",
+    "duration": 13814,
+    "is_sponsor": false
   },
   {
     "id": "iQY_lCcdHn8",
@@ -11189,17 +11815,9 @@
       "2:05:42  Квашеная - Весна"
     ],
     "list_type": "tracklist",
-    "author": "@rds1xtyn1ne98"
-  },
-  {
-    "id": "ymvFqWPLDJE",
-    "title": "ПЕСЕННЫЙ СТРИМ! Заходи, слушай)))✨ 💖",
-    "date": "24.04.2021",
-    "raw_date": "20210424",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 9006
+    "author": "@rds1xtyn1ne98",
+    "duration": 7804,
+    "is_sponsor": false
   },
   {
     "id": "TkVZL62KW8w",
@@ -11209,17 +11827,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 5591
-  },
-  {
-    "id": "mslNNRSt5XE",
-    "title": "Стрим с ПЕСНЯМИ!✨Заходи, смотри, слушай💖",
-    "date": "13.02.2021",
-    "raw_date": "20210213",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 15717
+    "duration": 5591,
+    "is_sponsor": false
   },
   {
     "id": "gU_FVnOs6F8",
@@ -11261,27 +11870,9 @@
       "04:04:24 (A) Юрий Яковлев - Колыбельная медведицы"
     ],
     "list_type": "tracklist",
-    "author": "@fardream"
-  },
-  {
-    "id": "mW85mXXNQ1o",
-    "title": "4-часовой стрим с песнями 🤩✨💖",
-    "date": "23.01.2021",
-    "raw_date": "20210123",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 15010
-  },
-  {
-    "id": "ByhBAY0ejMw",
-    "title": "Что петь будем?))) Капустина стримит! 🎁 🎄",
-    "date": "02.01.2021",
-    "raw_date": "20210102",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 12173
+    "author": "@fardream",
+    "duration": 14911,
+    "is_sponsor": false
   },
   {
     "id": "_u3NoBCFOQQ",
@@ -11291,7 +11882,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 157
+    "duration": 157,
+    "is_sponsor": false
   },
   {
     "id": "4j2W9j_jCz0",
@@ -11301,17 +11893,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 184
-  },
-  {
-    "id": "U8eRSC-KVyw",
-    "title": "Песенный стрим! Капустина в прямом эфире!:))",
-    "date": "07.06.2020",
-    "raw_date": "20200607",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 5808
+    "duration": 184,
+    "is_sponsor": false
   },
   {
     "id": "V9fqXVPzeGQ",
@@ -11321,7 +11904,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 426
+    "duration": 426,
+    "is_sponsor": false
   },
   {
     "id": "NItH7brh5q0",
@@ -11331,7 +11915,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 374
+    "duration": 374,
+    "is_sponsor": false
   },
   {
     "id": "BnG2qbwwYjQ",
@@ -11341,27 +11926,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 144
-  },
-  {
-    "id": "tmATcgNhqO8",
-    "title": "Сашка Капустина ОНЛАЙН!))) Что споём?))",
-    "date": "26.02.2020",
-    "raw_date": "20200226",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 4756
-  },
-  {
-    "id": "v3ea-8_SXT8",
-    "title": "Сашка Капустина ОНЛАЙН!))) Что споём?))",
-    "date": "21.02.2020",
-    "raw_date": "20200221",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 7734
+    "duration": 144,
+    "is_sponsor": false
   },
   {
     "id": "PEsZ3KVGrvE",
@@ -11371,7 +11937,19 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 415
+    "duration": 415,
+    "is_sponsor": false
+  },
+  {
+    "id": "v3ea-8_SXT8",
+    "title": "Сашка Капустина ОНЛАЙН!))) Что споём?))",
+    "date": "21.02.2020",
+    "raw_date": "20200221",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 7734,
+    "is_sponsor": false
   },
   {
     "id": "-R-AcP0tdIk",
@@ -11381,7 +11959,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 106
+    "duration": 106,
+    "is_sponsor": false
   },
   {
     "id": "2mKjZ_f8BDA",
@@ -11391,7 +11970,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 2785
+    "duration": 2785,
+    "is_sponsor": false
   },
   {
     "id": "bbVqCy9RYv0",
@@ -11401,7 +11981,8 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 126
+    "duration": 126,
+    "is_sponsor": false
   },
   {
     "id": "9yqOjHWL41E",
@@ -11411,36 +11992,7 @@
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 573
-  },
-  {
-    "id": "Ga-sGu4cRp0",
-    "title": "НОВОГОДНИЙ СТРИМ!! заходи, я тебя жду! будем петь вместе)))",
-    "date": "31.12.2019",
-    "raw_date": "20191231",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 4567
-  },
-  {
-    "id": "OUpHhCFkJqk",
-    "title": "у меня тут стрим, заходи, я тебя жду! 10 Марта 2019",
-    "date": "10.03.2019",
-    "raw_date": "20190310",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 2120
-  },
-  {
-    "id": "grHBnXLT3kM",
-    "title": "у меня тут стрим, заходи, я тебя жду! 10 февраля 2019",
-    "date": "10.02.2019",
-    "raw_date": "20190210",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 6798
+    "duration": 573,
+    "is_sponsor": false
   }
 ]
