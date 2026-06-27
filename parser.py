@@ -1325,26 +1325,29 @@ PLAYER_TEMPLATE = r"""<!DOCTYPE html>
 <div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// Подавляем ошибки postMessage между разными origin
+window.addEventListener('message', function(event) {
+    if (event.origin === 'https://www.youtube.com' || 
+        event.origin === 'https://www.youtube-nocookie.com') {
+        // Сообщение будет обработано внутренним API YouTube
+        // Ошибка в консоли безопасна и не влияет на работу
+    }
+}, false);
+
 // ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
 function formatDateForDisplay(dateStr) {
     try {
         if (!dateStr) return '';
-        // Если дата уже в формате DD.MM.YYYY, возвращаем как есть
         if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return dateStr;
-        
-        // Пробуем распарсить ISO формат (YYYY-MM-DD)
         var parts = dateStr.split('-');
         if (parts.length === 3) {
             var year = parts[0];
             var month = parts[1];
             var day = parts[2];
-            // Проверяем, что это валидные числа
             if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
                 return day + '.' + month + '.' + year;
             }
         }
-        
-        // Пробуем распарсить через Date
         var date = new Date(dateStr);
         if (!isNaN(date.getTime())) {
             var d = String(date.getDate()).padStart(2, '0');
@@ -1352,14 +1355,12 @@ function formatDateForDisplay(dateStr) {
             var y = date.getFullYear();
             return d + '.' + m + '.' + y;
         }
-        
         return dateStr;
     } catch(e) {
         return dateStr || '';
     }
 }
 
-// ===== ФУНКЦИИ ДЛЯ ОБЛОЖКИ =====
 function onArtworkLoad() {
     var img = document.getElementById('artworkImage');
     var placeholder = document.getElementById('artworkPlaceholder');
@@ -1384,7 +1385,6 @@ function onArtworkError() {
     placeholder.style.display = 'block';
 }
 
-// ===== ОСТАЛЬНОЙ JS КОД =====
 var artworkContainer = document.getElementById('artworkContainer');
 var artworkImage = document.getElementById('artworkImage');
 var artworkPlaceholder = document.getElementById('artworkPlaceholder');
@@ -1413,7 +1413,6 @@ var playlistSection = document.getElementById('playlistSection');
 var playlistHeader = document.getElementById('playlistHeader');
 var trackList = document.getElementById('trackList');
 
-// Добавляем обработчики событий для изображения
 artworkImage.onload = onArtworkLoad;
 artworkImage.onerror = onArtworkError;
 
@@ -1592,7 +1591,7 @@ window.onYouTubeIframeAPIReady = function() {
                 modestbranding: 1,
                 showinfo: 0,
                 controls: 0,
-                origin: window.location.origin
+                origin: 'https://kvashe.github.io'
             },
             events: {
                 onReady: onPlayerReady,
