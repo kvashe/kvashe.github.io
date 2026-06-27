@@ -560,17 +560,34 @@
     </div>
 </div>
 <div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
+
+<!-- Лёгкий блокировщик рекламы (не мешает Premium) -->
+<script>
+(function() {
+    var adPatterns = [
+        'doubleclick.net',
+        'googlesyndication.com',
+        '/pagead/',
+        '/api/stats/ads'
+    ];
+    
+    var originalFetch = window.fetch;
+    window.fetch = function(url) {
+        if (typeof url === 'string') {
+            for (var i = 0; i < adPatterns.length; i++) {
+                if (url.indexOf(adPatterns[i]) !== -1) {
+                    return Promise.resolve(new Response('', {status: 200}));
+                }
+            }
+        }
+        var args = Array.prototype.slice.call(arguments);
+        return originalFetch.apply(this, args);
+    };
+})();
+</script>
+
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Подавляем ошибки postMessage между разными origin
-window.addEventListener('message', function(event) {
-    if (event.origin === 'https://www.youtube.com' || 
-        event.origin === 'https://www.youtube-nocookie.com') {
-        // Сообщение будет обработано внутренним API YouTube
-        // Ошибка в консоли безопасна и не влияет на работу
-    }
-}, false);
-
 // ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
 function formatDateForDisplay(dateStr) {
     try {
@@ -967,6 +984,21 @@ function startTimeCheck() {
     if (checkInterval) clearInterval(checkInterval);
     checkInterval = setInterval(function() {
         if (!player || !player.getCurrentTime || !currentTrack) return;
+        
+        // Авто-пропуск рекламы (не мешает Premium)
+        try {
+            var state = player.getPlayerState();
+            var currentTime = player.getCurrentTime();
+            
+            if (state === 1 && currentTrack && currentTime < currentTrack.start - 2) {
+                player.seekTo(currentTrack.start);
+            }
+            
+            if (state === 1 && currentTime < currentTrack.start) {
+                player.seekTo(currentTrack.start);
+            }
+        } catch(e) {}
+        
         if (!videoDuration || videoDuration <= 0) {
             var dur = player.getDuration();
             if (dur && dur > 0) { videoDuration = dur; timeDuration.textContent = formatTime(videoDuration); }
@@ -1074,13 +1106,13 @@ function updateVolumeIcon() {
 volumeSlider.addEventListener('input', function() {
     volume = parseInt(this.value);
     applyVolumeToPlayer();
-});
+}, { passive: true });
 
 volumeIcon.addEventListener('click', function() {
     volume = volume > 0 ? 0 : 100;
     volumeSlider.value = volume;
     applyVolumeToPlayer();
-});
+}, { passive: true });
 
 progressContainer.addEventListener('mousemove', function(e) {
     if (videoDuration <= 0) return;
@@ -1089,15 +1121,58 @@ progressContainer.addEventListener('mousemove', function(e) {
     hoverTime.textContent = formatTime((percent / 100) * videoDuration);
     hoverTime.style.left = percent + '%';
     hoverTime.classList.add('active');
-});
+}, { passive: true });
 
-progressContainer.addEventListener('mouseleave', function() { hoverTime.classList.remove('active'); });
+progressContainer.addEventListener('mouseleave', function() { 
+    hoverTime.classList.remove('active'); 
+}, { passive: true });
 
 progressContainer.addEventListener('click', function(e) {
     if (!player || !playerReady || videoDuration <= 0) return;
     var rect = progressContainer.getBoundingClientRect();
     var percent = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
     player.seekTo((percent / 100) * videoDuration, true);
+}, { passive: true });
+
+playPauseBtn.addEventListener('click', togglePlayPause, { passive: true });
+nextBtn.addEventListener('click', nextTrack, { passive: true });
+prevBtn.addEventListener('click', prevTrack, { passive: true });
+shuffleBtn.addEventListener('click', shuffleTracks, { passive: true });
+repeatBtn.addEventListener('click', toggleRepeat, { passive: true });
+
+artworkContainer.addEventListener('click', function() {
+    if (currentTrack) window.open(currentTrack.url, '_blank');
+}, { passive: true });
+
+playlistHeader.addEventListener('click', function() {
+    playlistSection.classList.toggle('open');
+    if (playlistSection.classList.contains('open') && currentTrack) scrollToActiveTrack();
+}, { passive: true });
+
+trackList.addEventListener('click', function(e) {
+    var trackItem = e.target.closest('.track-item');
+    if (!trackItem) return;
+    var videoId = trackItem.getAttribute('data-videoid');
+    var start = parseInt(trackItem.getAttribute('data-start'));
+    for (var i = 0; i < currentList.length; i++) {
+        if (currentList[i].videoId === videoId && currentList[i].start === start) {
+            playTrackAtIndex(i); return;
+        }
+    }
+    for (var i = 0; i < masterTrackList.length; i++) {
+        if (masterTrackList[i].videoId === videoId && masterTrackList[i].start === start) {
+            isShuffled = false; updateShuffleButton();
+            currentList = masterTrackList.slice();
+            playTrackAtIndex(i); return;
+        }
+    }
+}, { passive: true });
+
+document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
+    else if (e.code === 'ArrowLeft' && player && playerReady) { e.preventDefault(); player.seekTo(Math.max(currentTrack ? currentTrack.start : 0, player.getCurrentTime() - 5), true); }
+    else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
 });
 
 function updateTrackListUI() {
@@ -1127,48 +1202,13 @@ function scrollToActiveTrack() {
     }, 200);
 }
 
-playPauseBtn.addEventListener('click', togglePlayPause);
-nextBtn.addEventListener('click', nextTrack);
-prevBtn.addEventListener('click', prevTrack);
-shuffleBtn.addEventListener('click', shuffleTracks);
-repeatBtn.addEventListener('click', toggleRepeat);
-
-artworkContainer.addEventListener('click', function() {
-    if (currentTrack) window.open(currentTrack.url, '_blank');
-});
-
-playlistHeader.addEventListener('click', function() {
-    playlistSection.classList.toggle('open');
-    if (playlistSection.classList.contains('open') && currentTrack) scrollToActiveTrack();
-});
-
-trackList.addEventListener('click', function(e) {
-    var trackItem = e.target.closest('.track-item');
-    if (!trackItem) return;
-    var videoId = trackItem.getAttribute('data-videoid');
-    var start = parseInt(trackItem.getAttribute('data-start'));
-    for (var i = 0; i < currentList.length; i++) {
-        if (currentList[i].videoId === videoId && currentList[i].start === start) {
-            playTrackAtIndex(i); return;
-        }
-    }
-    for (var i = 0; i < masterTrackList.length; i++) {
-        if (masterTrackList[i].videoId === videoId && masterTrackList[i].start === start) {
-            isShuffled = false; updateShuffleButton();
-            currentList = masterTrackList.slice();
-            playTrackAtIndex(i); return;
-        }
-    }
-});
-
-document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT') return;
-    if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
-    else if (e.code === 'ArrowLeft' && player && playerReady) { e.preventDefault(); player.seekTo(Math.max(currentTrack ? currentTrack.start : 0, player.getCurrentTime() - 5), true); }
-    else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
-});
-
 var scrollBtn = document.getElementById('scrollTopBtn');
+if (scrollBtn) {
+    scrollBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, { passive: true });
+}
+
 window.addEventListener('scroll', function() { 
     if (window.scrollY > 300) {
         if (scrollBtn) scrollBtn.classList.add('show');
@@ -1177,14 +1217,8 @@ window.addEventListener('scroll', function() {
     }
 }, { passive: true });
 
-if (scrollBtn) {
-    scrollBtn.addEventListener('click', function() {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-}
-
 if (typeof YT !== 'undefined' && YT.Player) window.onYouTubeIframeAPIReady();
-window.addEventListener('load', init);
+window.addEventListener('load', init, { passive: true });
 </script>
 </body>
 </html>
