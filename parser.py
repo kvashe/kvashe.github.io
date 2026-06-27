@@ -73,7 +73,6 @@ BANNED_WORDS = (
 # ===== Сессия requests с Retry =====
 SESSION = requests.Session()
 
-# Настраиваем Retry стратегию
 retry_strategy = Retry(
     total=5,
     backoff_factor=1,
@@ -99,14 +98,12 @@ class VideoData:
     is_sponsor: bool = False
 
     def to_dict(self) -> dict:
-        """Преобразует объект в словарь для JSON сериализации"""
         data = asdict(self)
         data['published_date'] = self.published_date.isoformat()
         return data
 
     @classmethod
     def from_dict(cls, data: dict) -> 'VideoData':
-        """Создает объект из словаря"""
         if 'published_date' in data:
             if isinstance(data['published_date'], str):
                 data['published_date'] = datetime.datetime.fromisoformat(data['published_date']).date()
@@ -115,12 +112,10 @@ class VideoData:
         return cls(**data)
     
     def get_formatted_date(self) -> str:
-        """Возвращает дату в формате DD.MM.YYYY для отображения"""
         return self.published_date.strftime("%d.%m.%Y")
 
 @dataclass(slots=True)
 class ParsedTimecode:
-    """Модель для парсинга одной строки таймкода"""
     start: int
     end: Optional[int]
     title: str
@@ -128,8 +123,6 @@ class ParsedTimecode:
 
 # ==================== YOUTUBE API КЛИЕНТ ====================
 class YouTubeAPI:
-    """Единый клиент для работы с YouTube API"""
-    
     BASE_URL = "https://www.googleapis.com/youtube/v3/"
     
     def __init__(self, api_key: str):
@@ -137,7 +130,6 @@ class YouTubeAPI:
         self.session = SESSION
     
     def _request(self, endpoint: str, params: dict, timeout: int = 10) -> dict:
-        """Базовый метод для всех API-запросов"""
         params["key"] = self.api_key
         
         try:
@@ -162,7 +154,6 @@ class YouTubeAPI:
             return {}
     
     def get_videos_info(self, video_ids: List[str]) -> Dict[str, dict]:
-        """Получает информацию о видео одним запросом"""
         if not video_ids:
             return {}
         
@@ -227,7 +218,6 @@ class YouTubeAPI:
         return all_info
     
     def get_comments(self, video_id: str, max_comments: int = 3000) -> List[dict]:
-        """Получает комментарии к видео"""
         comments = []
         page_token = None
 
@@ -278,7 +268,6 @@ class YouTubeAPI:
         return comments
     
     def check_sponsors(self, video_ids: List[str]) -> Set[str]:
-        """Проверяет пачку видео на спонсорство"""
         if not video_ids:
             return set()
         
@@ -532,7 +521,6 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
 
 # ==================== ПАРСИНГ ОДНОГО ВИДЕО ====================
 def parse_single_video(video_entry, video_info: dict, db: Dict[str, VideoData], args, youtube: YouTubeAPI):
-    """Парсит одно видео, используя уже полученную информацию о нем"""
     video_id = video_entry['id']
     title = video_entry.get('title', 'No Title')
     logging.info("Парсинг: %s...", title[:60])
@@ -1323,17 +1311,34 @@ PLAYER_TEMPLATE = r"""<!DOCTYPE html>
     </div>
 </div>
 <div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
+
+<!-- Лёгкий блокировщик рекламы (не мешает Premium) -->
+<script>
+(function() {
+    var adPatterns = [
+        'doubleclick.net',
+        'googlesyndication.com',
+        '/pagead/',
+        '/api/stats/ads'
+    ];
+    
+    var originalFetch = window.fetch;
+    window.fetch = function(url) {
+        if (typeof url === 'string') {
+            for (var i = 0; i < adPatterns.length; i++) {
+                if (url.indexOf(adPatterns[i]) !== -1) {
+                    return Promise.resolve(new Response('', {status: 200}));
+                }
+            }
+        }
+        var args = Array.prototype.slice.call(arguments);
+        return originalFetch.apply(this, args);
+    };
+})();
+</script>
+
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Подавляем ошибки postMessage между разными origin
-window.addEventListener('message', function(event) {
-    if (event.origin === 'https://www.youtube.com' || 
-        event.origin === 'https://www.youtube-nocookie.com') {
-        // Сообщение будет обработано внутренним API YouTube
-        // Ошибка в консоли безопасна и не влияет на работу
-    }
-}, false);
-
 // ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
 function formatDateForDisplay(dateStr) {
     try {
@@ -1730,6 +1735,21 @@ function startTimeCheck() {
     if (checkInterval) clearInterval(checkInterval);
     checkInterval = setInterval(function() {
         if (!player || !player.getCurrentTime || !currentTrack) return;
+        
+        // Авто-пропуск рекламы (не мешает Premium)
+        try {
+            var state = player.getPlayerState();
+            var currentTime = player.getCurrentTime();
+            
+            if (state === 1 && currentTrack && currentTime < currentTrack.start - 2) {
+                player.seekTo(currentTrack.start);
+            }
+            
+            if (state === 1 && currentTime < currentTrack.start) {
+                player.seekTo(currentTrack.start);
+            }
+        } catch(e) {}
+        
         if (!videoDuration || videoDuration <= 0) {
             var dur = player.getDuration();
             if (dur && dur > 0) { videoDuration = dur; timeDuration.textContent = formatTime(videoDuration); }
@@ -1837,13 +1857,13 @@ function updateVolumeIcon() {
 volumeSlider.addEventListener('input', function() {
     volume = parseInt(this.value);
     applyVolumeToPlayer();
-});
+}, { passive: true });
 
 volumeIcon.addEventListener('click', function() {
     volume = volume > 0 ? 0 : 100;
     volumeSlider.value = volume;
     applyVolumeToPlayer();
-});
+}, { passive: true });
 
 progressContainer.addEventListener('mousemove', function(e) {
     if (videoDuration <= 0) return;
@@ -1852,15 +1872,58 @@ progressContainer.addEventListener('mousemove', function(e) {
     hoverTime.textContent = formatTime((percent / 100) * videoDuration);
     hoverTime.style.left = percent + '%';
     hoverTime.classList.add('active');
-});
+}, { passive: true });
 
-progressContainer.addEventListener('mouseleave', function() { hoverTime.classList.remove('active'); });
+progressContainer.addEventListener('mouseleave', function() { 
+    hoverTime.classList.remove('active'); 
+}, { passive: true });
 
 progressContainer.addEventListener('click', function(e) {
     if (!player || !playerReady || videoDuration <= 0) return;
     var rect = progressContainer.getBoundingClientRect();
     var percent = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
     player.seekTo((percent / 100) * videoDuration, true);
+}, { passive: true });
+
+playPauseBtn.addEventListener('click', togglePlayPause, { passive: true });
+nextBtn.addEventListener('click', nextTrack, { passive: true });
+prevBtn.addEventListener('click', prevTrack, { passive: true });
+shuffleBtn.addEventListener('click', shuffleTracks, { passive: true });
+repeatBtn.addEventListener('click', toggleRepeat, { passive: true });
+
+artworkContainer.addEventListener('click', function() {
+    if (currentTrack) window.open(currentTrack.url, '_blank');
+}, { passive: true });
+
+playlistHeader.addEventListener('click', function() {
+    playlistSection.classList.toggle('open');
+    if (playlistSection.classList.contains('open') && currentTrack) scrollToActiveTrack();
+}, { passive: true });
+
+trackList.addEventListener('click', function(e) {
+    var trackItem = e.target.closest('.track-item');
+    if (!trackItem) return;
+    var videoId = trackItem.getAttribute('data-videoid');
+    var start = parseInt(trackItem.getAttribute('data-start'));
+    for (var i = 0; i < currentList.length; i++) {
+        if (currentList[i].videoId === videoId && currentList[i].start === start) {
+            playTrackAtIndex(i); return;
+        }
+    }
+    for (var i = 0; i < masterTrackList.length; i++) {
+        if (masterTrackList[i].videoId === videoId && masterTrackList[i].start === start) {
+            isShuffled = false; updateShuffleButton();
+            currentList = masterTrackList.slice();
+            playTrackAtIndex(i); return;
+        }
+    }
+}, { passive: true });
+
+document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
+    else if (e.code === 'ArrowLeft' && player && playerReady) { e.preventDefault(); player.seekTo(Math.max(currentTrack ? currentTrack.start : 0, player.getCurrentTime() - 5), true); }
+    else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
 });
 
 function updateTrackListUI() {
@@ -1890,48 +1953,13 @@ function scrollToActiveTrack() {
     }, 200);
 }
 
-playPauseBtn.addEventListener('click', togglePlayPause);
-nextBtn.addEventListener('click', nextTrack);
-prevBtn.addEventListener('click', prevTrack);
-shuffleBtn.addEventListener('click', shuffleTracks);
-repeatBtn.addEventListener('click', toggleRepeat);
-
-artworkContainer.addEventListener('click', function() {
-    if (currentTrack) window.open(currentTrack.url, '_blank');
-});
-
-playlistHeader.addEventListener('click', function() {
-    playlistSection.classList.toggle('open');
-    if (playlistSection.classList.contains('open') && currentTrack) scrollToActiveTrack();
-});
-
-trackList.addEventListener('click', function(e) {
-    var trackItem = e.target.closest('.track-item');
-    if (!trackItem) return;
-    var videoId = trackItem.getAttribute('data-videoid');
-    var start = parseInt(trackItem.getAttribute('data-start'));
-    for (var i = 0; i < currentList.length; i++) {
-        if (currentList[i].videoId === videoId && currentList[i].start === start) {
-            playTrackAtIndex(i); return;
-        }
-    }
-    for (var i = 0; i < masterTrackList.length; i++) {
-        if (masterTrackList[i].videoId === videoId && masterTrackList[i].start === start) {
-            isShuffled = false; updateShuffleButton();
-            currentList = masterTrackList.slice();
-            playTrackAtIndex(i); return;
-        }
-    }
-});
-
-document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT') return;
-    if (e.code === 'Space') { e.preventDefault(); togglePlayPause(); }
-    else if (e.code === 'ArrowLeft' && player && playerReady) { e.preventDefault(); player.seekTo(Math.max(currentTrack ? currentTrack.start : 0, player.getCurrentTime() - 5), true); }
-    else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
-});
-
 var scrollBtn = document.getElementById('scrollTopBtn');
+if (scrollBtn) {
+    scrollBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, { passive: true });
+}
+
 window.addEventListener('scroll', function() { 
     if (window.scrollY > 300) {
         if (scrollBtn) scrollBtn.classList.add('show');
@@ -1940,14 +1968,8 @@ window.addEventListener('scroll', function() {
     }
 }, { passive: true });
 
-if (scrollBtn) {
-    scrollBtn.addEventListener('click', function() {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-}
-
 if (typeof YT !== 'undefined' && YT.Player) window.onYouTubeIframeAPIReady();
-window.addEventListener('load', init);
+window.addEventListener('load', init, { passive: true });
 </script>
 </body>
 </html>"""
@@ -2153,45 +2175,46 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
 <script>
 (function() {
-    const notesContainer = document.getElementById('parallaxNotes');
+    var notesContainer = document.getElementById('parallaxNotes');
     if (!notesContainer) return;
-    const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
-    const notesCount = 10;
-    const notes = [];
-    for (let i = 0; i < notesCount; i++) {
-        const noteDiv = document.createElement('div');
+    var noteSymbols = ['♩', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
+    var notesCount = 10;
+    var notes = [];
+    for (var i = 0; i < notesCount; i++) {
+        var noteDiv = document.createElement('div');
         noteDiv.className = 'note';
-        const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
-        const size = Math.floor(Math.random() * 130) + 50;
-        const left = Math.random() * 100;
-        const top = Math.random() * 100;
-        const opacity = Math.random() * 0.4 + 0.2;
-        const rotation = Math.random() * 360;
-        const parallaxFactor = 0.2 + Math.random() * 0.6;
-        const contentSpan = document.createElement('span');
+        var symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
+        var size = Math.floor(Math.random() * 130) + 50;
+        var left = Math.random() * 100;
+        var top = Math.random() * 100;
+        var opacity = Math.random() * 0.4 + 0.2;
+        var rotation = Math.random() * 360;
+        var parallaxFactor = 0.2 + Math.random() * 0.6;
+        var contentSpan = document.createElement('span');
         contentSpan.className = 'note-content';
         contentSpan.textContent = symbol;
         contentSpan.style.fontSize = size + 'px';
         contentSpan.style.opacity = opacity;
-        contentSpan.style.color = `rgba(255, 255, 255, ${opacity * 0.9})`;
-        const animDuration = 4 + Math.random() * 6;
-        contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
-        contentSpan.style.animationDelay = `${Math.random() * 3}s`;
+        contentSpan.style.color = 'rgba(255, 255, 255, ' + (opacity * 0.9) + ')';
+        var animDuration = 4 + Math.random() * 6;
+        contentSpan.style.animation = 'gentleFloat ' + animDuration + 's infinite ease-in-out';
+        contentSpan.style.animationDelay = (Math.random() * 3) + 's';
         noteDiv.appendChild(contentSpan);
         noteDiv.style.left = left + '%';
         noteDiv.style.top = top + '%';
-        noteDiv.style.transform = `rotate(${rotation}deg)`;
+        noteDiv.style.transform = 'rotate(' + rotation + 'deg)';
         notesContainer.appendChild(noteDiv);
-        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
+        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor: parallaxFactor });
     }
-    let ticking = false;
+    var ticking = false;
     function updateNotesPosition() {
-        const scrollY = window.scrollY;
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
-        for (let n of notes) {
-            const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
-            let newTop = n.baseTop + shiftPercent;
+        var scrollY = window.scrollY;
+        var maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        var scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
+        for (var i = 0; i < notes.length; i++) {
+            var n = notes[i];
+            var shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
+            var newTop = n.baseTop + shiftPercent;
             newTop = Math.min(Math.max(newTop, -5), 105);
             n.element.style.top = newTop + '%';
         }
@@ -2205,14 +2228,14 @@ INDEX_TEMPLATE = r"""<!DOCTYPE html>
     }, { passive: true });
     window.addEventListener('resize', function() {
         updateNotesPosition();
-    });
+    }, { passive: true });
     updateNotesPosition();
 })();
 
 function escapeHtml(str) {
     try {
         if (str == null) return '';
-        const div = document.createElement('div');
+        var div = document.createElement('div');
         div.appendChild(document.createTextNode(String(str)));
         return div.innerHTML;
     } catch(e) {
@@ -2224,7 +2247,7 @@ function normalize(str) {
     try {
         if (str == null) return '';
         return String(str).toLowerCase()
-                  .replace(/ë/g, 'e')
+                  .replace(/ё/g, 'e')
                   .replace(/[^a-zа-яё0-9]/g, '');
     } catch(e) {
         return '';
@@ -2235,12 +2258,12 @@ function removeSpecificEmojis(str) {
     try {
         if (str == null) return '';
         if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-            const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
-            const segments = [...segmenter.segment(str)];
-            let result = '';
-            for (const seg of segments) {
-                const grapheme = seg.segment;
-                const isEmoji = /\p{Emoji}/u.test(grapheme) && !/[\p{N}\p{L}]/u.test(grapheme);
+            var segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+            var segments = Array.from(segmenter.segment(str));
+            var result = '';
+            for (var i = 0; i < segments.length; i++) {
+                var grapheme = segments[i].segment;
+                var isEmoji = /\p{Emoji}/u.test(grapheme) && !/[\p{N}\p{L}]/u.test(grapheme);
                 if (!isEmoji) {
                     result += grapheme;
                 }
@@ -2254,7 +2277,7 @@ function removeSpecificEmojis(str) {
     }
 }
 
-const SYNONYMS = {
+var SYNONYMS = {
     "noizemc": ["noizemc", "noizemc", "нойзмс", "нойзмс", "noize", "нойз"],
     "rammstein": ["rammstein", "раммштайн"],
     "корольишут": ["корольишут", "киш"],
@@ -2267,19 +2290,22 @@ const SYNONYMS = {
     "iowa": ["iowa", "айова"]
 };
 
-const variantToCanon = new Map();
-for (const [canon, variants] of Object.entries(SYNONYMS)) {
-    for (const v of variants) {
-        variantToCanon.set(v, canon);
+var variantToCanon = new Map();
+for (var canon in SYNONYMS) {
+    if (SYNONYMS.hasOwnProperty(canon)) {
+        var variants = SYNONYMS[canon];
+        for (var i = 0; i < variants.length; i++) {
+            variantToCanon.set(variants[i], canon);
+        }
     }
 }
 
 function getSearchVariants(query) {
     try {
         if (!query) return [];
-        const normQuery = normalize(query);
+        var normQuery = normalize(query);
         if (variantToCanon.has(normQuery)) {
-            const canon = variantToCanon.get(normQuery);
+            var canon = variantToCanon.get(normQuery);
             return SYNONYMS[canon] || [normQuery];
         }
         return [normQuery];
@@ -2291,9 +2317,9 @@ function getSearchVariants(query) {
 function matchesWithVariants(textNorm, variants) {
     try {
         if (!textNorm || !variants || variants.length === 0) return false;
-        for (let v of variants) {
-            const normVariant = normalize(v);
-            if (textNorm.includes(normVariant)) return true;
+        for (var i = 0; i < variants.length; i++) {
+            var normVariant = normalize(variants[i]);
+            if (textNorm.indexOf(normVariant) !== -1) return true;
         }
         return false;
     } catch(e) {
@@ -2304,51 +2330,51 @@ function matchesWithVariants(textNorm, variants) {
 function highlightFirstMatch(escapedText, variants) {
     try {
         if (!variants || variants.length === 0 || !escapedText) return escapedText || '';
-        const normEscaped = normalize(escapedText);
-        let bestMatch = null;
-        let bestIndex = Infinity;
-        for (let v of variants) {
-            const normV = normalize(v);
-            const idx = normEscaped.indexOf(normV);
+        var normEscaped = normalize(escapedText);
+        var bestMatch = null;
+        var bestIndex = Infinity;
+        for (var i = 0; i < variants.length; i++) {
+            var normV = normalize(variants[i]);
+            var idx = normEscaped.indexOf(normV);
             if (idx !== -1 && idx < bestIndex) {
                 bestIndex = idx;
                 bestMatch = normV;
             }
         }
         if (bestMatch === null) return escapedText;
-        let origIdx = 0, normIdx = 0;
+        var origIdx = 0, normIdx = 0;
         while (normIdx < bestIndex && origIdx < escapedText.length) {
-            const ch = escapedText[origIdx];
-            const nch = normalize(ch);
+            var ch = escapedText[origIdx];
+            var nch = normalize(ch);
             if (nch.length > 0) normIdx++;
             origIdx++;
         }
-        const start = origIdx;
+        var start = origIdx;
         while (normIdx < bestIndex + bestMatch.length && origIdx < escapedText.length) {
-            const ch = escapedText[origIdx];
-            const nch = normalize(ch);
-            if (nch.length > 0) normIdx++;
+            var ch2 = escapedText[origIdx];
+            var nch2 = normalize(ch2);
+            if (nch2.length > 0) normIdx++;
             origIdx++;
         }
-        const end = origIdx;
+        var end = origIdx;
         return escapedText.substring(0, start) + '<mark>' + escapedText.substring(start, end) + '</mark>' + escapedText.substring(end);
     } catch(e) {
         return escapedText || '';
     }
 }
 
-let streamsData = [];
-let songsDB = {};
-let searchIndex = [];
-let activeYear = 'all';
-let allRows = [];
+var streamsData = [];
+var songsDB = {};
+var searchIndex = [];
+var activeYear = 'all';
+var allRows = [];
 
 function getTimecodeSeconds(line) {
     try {
         if (!line) return 99999999;
-        const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+        var match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
         if (!match) return 99999999;
-        const parts = match[1].split(':').map(Number);
+        var parts = match[1].split(':').map(Number);
         if (parts.length === 2) return parts[0]*60 + parts[1];
         if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
         return 99999999;
@@ -2360,88 +2386,95 @@ function getTimecodeSeconds(line) {
 function normalizeTimecode(tc) {
     try {
         if (!tc) return '00:00:00';
-        const parts = tc.split(':').map(Number);
-        if (parts.length === 2) return `00:${parts[0].toString().padStart(2,'0')}:${parts[1].toString().padStart(2,'0')}`;
-        if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
+        var parts = tc.split(':').map(Number);
+        if (parts.length === 2) return '00:' + parts[0].toString().padStart(2,'0') + ':' + parts[1].toString().padStart(2,'0');
+        if (parts.length === 3) return parts.map(function(p) { return p.toString().padStart(2,'0'); }).join(':');
         return tc;
     } catch(e) {
         return '00:00:00';
     }
 }
 
-async function loadDatabase() {
-    if (streamsData.length > 0) return;
-    try {
-        const response = await fetch('parsed_streams_db.json');
-        if (!response.ok) throw new Error('Файл базы не найден');
-        let rawData = await response.json();
-        rawData.sort((a, b) => {
-            const dateA = a.published_date || '1970-01-01';
-            const dateB = b.published_date || '1970-01-01';
-            return dateB.localeCompare(dateA);
-        });
-        streamsData = rawData.filter(entry => entry.list_type === 'tracklist' || entry.list_type === 'mixed');
-        songsDB = {};
-        searchIndex = [];
-        streamsData.forEach(entry => {
-            const vId = entry.id;
-            const timecodes = entry.timecodes || [];
-            const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
-            const tracks = sorted.map(line => {
-                try {
-                    const cleanedLine = String(line || '').replace(
-                        /(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*\d{1,2}:\d{2}(?::\d{2})?/,
-                        '$1'
-                    );
-                    const match = cleanedLine.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-                    if (match) {
-                        let s = cleanedLine.replace(match[1], '').trim();
-                        s = s.replace(/^[-–—]\s*/, '');
-                        s = removeSpecificEmojis(s);
-                        return { t: match[1], s: s };
-                    } else {
-                        let s = removeSpecificEmojis(cleanedLine);
-                        return { s: s };
+function loadDatabase() {
+    if (streamsData.length > 0) return Promise.resolve();
+    return fetch('parsed_streams_db.json')
+        .then(function(response) {
+            if (!response.ok) throw new Error('Файл базы не найден');
+            return response.json();
+        })
+        .then(function(rawData) {
+            rawData.sort(function(a, b) {
+                var dateA = a.published_date || '1970-01-01';
+                var dateB = b.published_date || '1970-01-01';
+                return dateB.localeCompare(dateA);
+            });
+            streamsData = rawData.filter(function(entry) {
+                return entry.list_type === 'tracklist' || entry.list_type === 'mixed';
+            });
+            songsDB = {};
+            searchIndex = [];
+            streamsData.forEach(function(entry) {
+                var vId = entry.id;
+                var timecodes = entry.timecodes || [];
+                var sorted = timecodes.slice().sort(function(a, b) {
+                    return getTimecodeSeconds(a) - getTimecodeSeconds(b);
+                });
+                var tracks = sorted.map(function(line) {
+                    try {
+                        var cleanedLine = String(line || '').replace(
+                            /(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*\d{1,2}:\d{2}(?::\d{2})?/,
+                            '$1'
+                        );
+                        var match = cleanedLine.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+                        if (match) {
+                            var s = cleanedLine.replace(match[1], '').trim();
+                            s = s.replace(/^[-–—]\s*/, '');
+                            s = removeSpecificEmojis(s);
+                            return { t: match[1], s: s };
+                        } else {
+                            var s2 = removeSpecificEmojis(cleanedLine);
+                            return { s: s2 };
+                        }
+                    } catch(e) {
+                        return { s: '' };
                     }
-                } catch(e) {
-                    return { s: '' };
-                }
+                });
+                songsDB[vId] = { tracks: tracks, author: entry.author || '' };
+                tracks.forEach(function(tr) {
+                    try {
+                        var norm = normalize(tr.s || '');
+                        searchIndex.push({ id: vId, text: tr.s, norm: norm });
+                    } catch(e) {}
+                });
             });
-            songsDB[vId] = { tracks, author: entry.author || '' };
-            tracks.forEach(tr => {
-                try {
-                    const norm = normalize(tr.s || '');
-                    searchIndex.push({ id: vId, text: tr.s, norm: norm });
-                } catch(e) {}
-            });
+        })
+        .catch(function(e) {
+            console.error('Ошибка загрузки базы:', e);
+            streamsData = [];
+            var grid = document.getElementById('mainGrid');
+            if (grid) {
+                grid.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">⚠️ Не удалось загрузить базу треклистов. Проверьте подключение к интернету.</div>';
+            }
         });
-    } catch(e) {
-        console.error('Ошибка загрузки базы:', e);
-        streamsData = [];
-        const grid = document.getElementById('mainGrid');
-        if (grid) {
-            grid.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">⚠️ Не удалось загрузить базу треклистов. Проверьте подключение к интернету.</div>';
-        }
-    }
 }
 
 function renderStreamHTML(stream) {
     try {
-        const vId = stream.id;
-        const title = escapeHtml(stream.title || 'Без названия');
+        var vId = stream.id;
+        var title = escapeHtml(stream.title || 'Без названия');
         
-        let date = 'Неизвестно';
-        let rawYear = '0000';
+        var date = 'Неизвестно';
+        var rawYear = '0000';
         
         if (stream.published_date) {
             try {
-                let dateStr = stream.published_date;
+                var dateStr = stream.published_date;
                 if (typeof dateStr !== 'string') {
                     dateStr = String(dateStr);
                 }
-                const parts = dateStr.split('-');
+                var parts = dateStr.split('-');
                 if (parts.length === 3) {
-                    date = `${parts[2]}.${parts[1]}.${parts[0]}`;
+                    date = parts[2] + '.' + parts[1] + '.' + parts[0];
                     rawYear = parts[0];
                 }
             } catch(e) {
@@ -2451,15 +2484,15 @@ function renderStreamHTML(stream) {
         }
         date = escapeHtml(date);
         
-        const timecodes = stream.timecodes || [];
-        const listType = stream.list_type || 'none';
-        const isSponsor = stream.is_sponsor || false;
-        const hasTracks = timecodes.length > 0;
-        const sponsorClass = isSponsor ? ' sponsor' : '';
-        const badgeClass = `badge-${listType}`;
-        const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
-        const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${timecodes.length}</span><span class="badge ${badgeClass}">${badgeText}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
-        return `<div class="row${sponsorClass}" data-id="${vId}" data-year="${rawYear}" style="--bg-thumb: url('https://img.youtube.com/vi/${vId}/hqdefault.jpg');"><span class="v-date">${date}</span><a class="v-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${vId}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><span class="v-title">${title}</span></a><div class="v-tcs">${tcsHTML}</div></div></div>`;
+        var timecodes = stream.timecodes || [];
+        var listType = stream.list_type || 'none';
+        var isSponsor = stream.is_sponsor || false;
+        var hasTracks = timecodes.length > 0;
+        var sponsorClass = isSponsor ? ' sponsor' : '';
+        var badgeClass = 'badge-' + listType;
+        var badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
+        var tcsHTML = hasTracks ? '<details><summary><div class="summary-flex"><span>Треклист ' + timecodes.length + '</span><span class="badge ' + badgeClass + '">' + badgeText + '</span></div></summary><div class="tc-list"></div></details>' : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
+        return '<div class="row' + sponsorClass + '" data-id="' + vId + '" data-year="' + rawYear + '" style="--bg-thumb: url(\'https://img.youtube.com/vi/' + vId + '/hqdefault.jpg\');"><span class="v-date">' + date + '</span><a class="v-link" href="https://www.youtube.com/watch?v=' + vId + '" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/' + vId + '/hqdefault.jpg" alt="" onerror="this.style.opacity=\'0\';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=' + vId + '" target="_blank"><span class="v-title">' + title + '</span></a><div class="v-tcs">' + tcsHTML + '</div></div></div>';
     } catch(e) {
         return '<div class="row" style="padding:20px;color:#94a3b8;">Ошибка рендеринга</div>';
     }
@@ -2480,25 +2513,25 @@ function animateContainer(container) {
 
 function renderAllStreams() {
     try {
-        const grid = document.getElementById('mainGrid');
+        var grid = document.getElementById('mainGrid');
         grid.innerHTML = streamsData.map(renderStreamHTML).join('');
-        allRows = [...grid.querySelectorAll('.row')];
-        document.querySelectorAll('details').forEach(details => {
+        allRows = Array.from(grid.querySelectorAll('.row'));
+        document.querySelectorAll('details').forEach(function(details) {
             details.addEventListener('toggle', function() {
                 try {
-                    const container = this.querySelector('.tc-list');
+                    var container = this.querySelector('.tc-list');
                     if (!container) return;
                     if (this.open) {
-                        const row = this.closest('.row');
-                        const vId = row ? row.getAttribute('data-id') : null;
-                        const filter = searchInput.value.toLowerCase().trim();
+                        var row = this.closest('.row');
+                        var vId = row ? row.getAttribute('data-id') : null;
+                        var filter = searchInput.value.toLowerCase().trim();
                         if (container.children.length === 0 && vId) renderTracklist(vId, container, filter);
                         animateContainer(container);
                         if (filter) {
-                            setTimeout(() => {
-                                const mark = container.querySelector('mark');
+                            setTimeout(function() {
+                                var mark = container.querySelector('mark');
                                 if (mark) {
-                                    const item = mark.closest('.tc-item');
+                                    var item = mark.closest('.tc-item');
                                     if (item) container.scrollTop = item.offsetTop - container.offsetTop - 10;
                                 }
                             }, 50);
@@ -2509,7 +2542,7 @@ function renderAllStreams() {
                         container.style.transform = 'translateY(-10px)';
                     }
                 } catch(e) {}
-            });
+            }, { passive: true });
         });
     } catch(e) {
         console.error('Ошибка рендеринга:', e);
@@ -2518,35 +2551,38 @@ function renderAllStreams() {
 
 function initYearFilters() {
     try {
-        const yearsSet = new Set();
-        allRows.forEach(row => { const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); });
-        const sortedYears = Array.from(yearsSet).sort().reverse();
-        const container = document.getElementById('yearFilters');
-        const currentYear = new Date().getFullYear().toString();
+        var yearsSet = new Set();
+        allRows.forEach(function(row) {
+            var y = row.getAttribute('data-year');
+            if(y && y !== '0000') yearsSet.add(y);
+        });
+        var sortedYears = Array.from(yearsSet).sort().reverse();
+        var container = document.getElementById('yearFilters');
+        var currentYear = new Date().getFullYear().toString();
         
-        let html = '<button class="year-btn" data-year="all">Все годы</button>';
-        sortedYears.forEach(y => {
-            const isActive = y === currentYear ? ' active' : '';
-            html += `<button class="year-btn${isActive}" data-year="${y}">${y} года</button>`;
+        var html = '<button class="year-btn" data-year="all">Все годы</button>';
+        sortedYears.forEach(function(y) {
+            var isActive = y === currentYear ? ' active' : '';
+            html += '<button class="year-btn' + isActive + '" data-year="' + y + '">' + y + ' года</button>';
         });
         container.innerHTML = html;
         
-        if (sortedYears.includes(currentYear)) {
+        if (sortedYears.indexOf(currentYear) !== -1) {
             activeYear = currentYear;
         } else {
             activeYear = 'all';
-            const allBtn = container.querySelector('[data-year="all"]');
+            var allBtn = container.querySelector('[data-year="all"]');
             if (allBtn) allBtn.classList.add('active');
         }
         
-        container.addEventListener('click', (e) => {
+        container.addEventListener('click', function(e) {
             if(e.target.classList.contains('year-btn')) {
-                document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.year-btn').forEach(function(b) { b.classList.remove('active'); });
                 e.target.classList.add('active');
                 activeYear = e.target.getAttribute('data-year');
                 executeSearch(searchInput.value.toLowerCase().trim());
             }
-        });
+        }, { passive: true });
     } catch(e) {
         console.error('Ошибка инициализации фильтров:', e);
     }
@@ -2554,64 +2590,64 @@ function initYearFilters() {
 
 function renderTracklist(vId, container, filter) {
     try {
-        const tracks = songsDB[vId]?.tracks || [];
-        let html = '';
+        var tracks = songsDB[vId] ? songsDB[vId].tracks : [];
+        var html = '';
         if (filter) {
-            const variants = getSearchVariants(filter);
-            tracks.forEach(tr => {
+            var variants = getSearchVariants(filter);
+            tracks.forEach(function(tr) {
                 try {
-                    let sText = tr.s || '';
+                    var sText = tr.s || '';
                     sText = escapeHtml(sText);
-                    const normText = normalize(sText);
+                    var normText = normalize(sText);
                     if (matchesWithVariants(normText, variants)) {
                         sText = highlightFirstMatch(sText, variants);
                     }
-                    const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-                    html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${sText}</span></div>` : `<div class="tc-item"><span class="s-title">${sText}</span></div>`;
+                    var displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
+                    html += tr.t ? '<div class="tc-item"><span class="t-click" data-time="' + tr.t + '">' + displayedTime + '</span><span class="s-title">' + sText + '</span></div>' : '<div class="tc-item"><span class="s-title">' + sText + '</span></div>';
                 } catch(e) {}
             });
         } else {
-            tracks.forEach(tr => {
+            tracks.forEach(function(tr) {
                 try {
-                    const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-                    const safeText = escapeHtml(tr.s || '');
-                    html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${safeText}</span></div>` : `<div class="tc-item"><span class="s-title">${safeText}</span></div>`;
+                    var displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
+                    var safeText = escapeHtml(tr.s || '');
+                    html += tr.t ? '<div class="tc-item"><span class="t-click" data-time="' + tr.t + '">' + displayedTime + '</span><span class="s-title">' + safeText + '</span></div>' : '<div class="tc-item"><span class="s-title">' + safeText + '</span></div>';
                 } catch(e) {}
             });
         }
-        const author = songsDB[vId]?.author;
-        if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${escapeHtml(author)}</div>`;
+        var author = songsDB[vId] ? songsDB[vId].author : '';
+        if (author && author.trim() !== '') html += '<div class="tc-author">Автор треклиста: ' + escapeHtml(author) + '</div>';
         container.innerHTML = html;
     } catch(e) {
         container.innerHTML = '<div class="tc-item">Ошибка загрузки треков</div>';
     }
 }
 
-const searchInput = document.getElementById('sInput');
-const clearBtn = document.getElementById('sClear');
-const statsEl = document.getElementById('searchStats');
+var searchInput = document.getElementById('sInput');
+var clearBtn = document.getElementById('sClear');
+var statsEl = document.getElementById('searchStats');
 
-async function executeSearch(filter) {
+function executeSearch(filter) {
     try {
         if (allRows.length === 0) return;
-        let visibleCount = 0;
-        const sponsorToggle = document.getElementById('sponsorToggle');
-        const showSponsors = sponsorToggle ? sponsorToggle.checked : false;
-        const variants = filter ? getSearchVariants(filter) : [];
+        var visibleCount = 0;
+        var sponsorToggle = document.getElementById('sponsorToggle');
+        var showSponsors = sponsorToggle ? sponsorToggle.checked : false;
+        var variants = filter ? getSearchVariants(filter) : [];
         clearBtn.style.display = filter ? 'flex' : 'none';
-        allRows.forEach(row => {
+        allRows.forEach(function(row) {
             row.style.display = 'none';
-            const details = row.querySelector('details');
+            var details = row.querySelector('details');
             if (details) {
                 details.open = false;
-                const tcList = details.querySelector('.tc-list');
+                var tcList = details.querySelector('.tc-list');
                 if (tcList) { tcList.style.transition = 'none'; tcList.style.opacity = '0'; tcList.style.transform = 'translateY(-10px)'; tcList.innerHTML = ''; }
             }
         });
         if (!filter) {
-            allRows.forEach(row => { 
-                const rowYear = row.getAttribute('data-year'); 
-                const isSponsor = row.classList.contains('sponsor');
+            allRows.forEach(function(row) { 
+                var rowYear = row.getAttribute('data-year'); 
+                var isSponsor = row.classList.contains('sponsor');
                 if ((activeYear === 'all' || rowYear === activeYear) && (showSponsors || !isSponsor)) { 
                     row.style.display = ''; 
                     visibleCount++; 
@@ -2620,31 +2656,31 @@ async function executeSearch(filter) {
             statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
             return;
         }
-        const matchedIds = new Set();
-        searchIndex.forEach(item => {
+        var matchedIds = new Set();
+        searchIndex.forEach(function(item) {
             if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id);
         });
-        const isDesktop = window.innerWidth > 768;
-        allRows.forEach(row => {
-            const vId = row.getAttribute('data-id');
-            const rowYear = row.getAttribute('data-year');
+        var isDesktop = window.innerWidth > 768;
+        allRows.forEach(function(row) {
+            var vId = row.getAttribute('data-id');
+            var rowYear = row.getAttribute('data-year');
             if (activeYear !== 'all' && rowYear !== activeYear) return;
             if (!matchedIds.has(vId)) return;
-            const isSponsor = row.classList.contains('sponsor');
+            var isSponsor = row.classList.contains('sponsor');
             if (!showSponsors && isSponsor) return;
             row.style.display = '';
             visibleCount++;
             if (isDesktop && filter.length >= 2) {
-                const details = row.querySelector('details');
-                const tcList = row.querySelector('.tc-list');
+                var details = row.querySelector('details');
+                var tcList = row.querySelector('.tc-list');
                 if (details && tcList && tcList.children.length === 0) {
                     details.open = true;
                     renderTracklist(vId, tcList, filter);
                     animateContainer(tcList);
-                    setTimeout(() => {
-                        const mark = tcList.querySelector('mark');
+                    setTimeout(function() {
+                        var mark = tcList.querySelector('mark');
                         if (mark) {
-                            const item = mark.closest('.tc-item');
+                            var item = mark.closest('.tc-item');
                             if (item) tcList.scrollTop = item.offsetTop - tcList.offsetTop - 10;
                         }
                     }, 50);
@@ -2657,7 +2693,7 @@ async function executeSearch(filter) {
     }
 }
 
-const scrollBtn = document.getElementById('scrollTopBtn');
+var scrollBtn = document.getElementById('scrollTopBtn');
 window.addEventListener('scroll', function() {
     try {
         if (window.scrollY > 300) {
@@ -2673,40 +2709,39 @@ if (scrollBtn) {
         try {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch(e) {}
-    });
+    }, { passive: true });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        await loadDatabase();
+document.addEventListener('DOMContentLoaded', function() {
+    loadDatabase().then(function() {
         renderAllStreams();
         initYearFilters();
         
-        const sponsorToggleLabel = document.getElementById('sponsorToggleLabel');
+        var sponsorToggleLabel = document.getElementById('sponsorToggleLabel');
         if (sponsorToggleLabel && document.querySelector('.row.sponsor')) {
             sponsorToggleLabel.style.display = 'flex';
         }
         
         executeSearch('');
-    } catch(e) {
+    }).catch(function(e) {
         console.error('Ошибка инициализации:', e);
-    }
+    });
 });
 
-document.getElementById('mainGrid').addEventListener('click', (e) => {
+document.getElementById('mainGrid').addEventListener('click', function(e) {
     try {
         if (e.target.classList.contains('t-click')) {
             e.preventDefault();
-            const time = e.target.getAttribute('data-time');
-            const vId = e.target.closest('.row').getAttribute('data-id');
-            const parts = time.split(':').map(Number);
-            const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
-            window.open(`https://www.youtube.com/watch?v=${vId}&t=${secs}s`, '_blank');
+            var time = e.target.getAttribute('data-time');
+            var vId = e.target.closest('.row').getAttribute('data-id');
+            var parts = time.split(':').map(Number);
+            var secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
+            window.open('https://www.youtube.com/watch?v=' + vId + '&t=' + secs + 's', '_blank');
         }
     } catch(e) {}
-});
+}, { passive: true });
 
-let debounceTimer;
+var debounceTimer;
 searchInput.addEventListener('input', function() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function() {
@@ -2714,13 +2749,13 @@ searchInput.addEventListener('input', function() {
             executeSearch(searchInput.value.toLowerCase().trim());
         } catch(e) {}
     }, 700);
-});
+}, { passive: true });
 
 clearBtn.addEventListener('click', function() {
     searchInput.value = '';
     clearBtn.style.display = 'none';
     executeSearch('');
-});
+}, { passive: true });
 </script>
 </body>
 </html>"""
