@@ -486,7 +486,7 @@
 <div class="container" id="playerContainer">
     <div class="artwork-container" id="artworkContainer">
         <div class="artwork-placeholder" id="artworkPlaceholder"></div>
-        <img class="artwork-image" id="artworkImage" src="" alt="Обложка видео" style="display:none;" onload="onArtworkLoad()" onerror="onArtworkError()">
+        <img class="artwork-image" id="artworkImage" src="" alt="Обложка видео" style="display:none;">
         <div class="artwork-overlay">
             <div class="play-icon-overlay">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -559,17 +559,69 @@
         </a>
     </div>
 </div>
-<div id="ytplayer"
-     style="
-        position:absolute;
-        width:1px;
-        height:1px;
-        opacity:0.01;
-        pointer-events:none;
-     ">
-</div>
+<div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
+function formatDateForDisplay(dateStr) {
+    try {
+        if (!dateStr) return '';
+        // Если дата уже в формате DD.MM.YYYY, возвращаем как есть
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return dateStr;
+        
+        // Пробуем распарсить ISO формат (YYYY-MM-DD)
+        var parts = dateStr.split('-');
+        if (parts.length === 3) {
+            var year = parts[0];
+            var month = parts[1];
+            var day = parts[2];
+            // Проверяем, что это валидные числа
+            if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                return day + '.' + month + '.' + year;
+            }
+        }
+        
+        // Пробуем распарсить через Date
+        var date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            var d = String(date.getDate()).padStart(2, '0');
+            var m = String(date.getMonth() + 1).padStart(2, '0');
+            var y = date.getFullYear();
+            return d + '.' + m + '.' + y;
+        }
+        
+        return dateStr;
+    } catch(e) {
+        return dateStr || '';
+    }
+}
+
+// ===== ФУНКЦИИ ДЛЯ ОБЛОЖКИ =====
+function onArtworkLoad() {
+    var img = document.getElementById('artworkImage');
+    var placeholder = document.getElementById('artworkPlaceholder');
+    var container = document.getElementById('playerContainer');
+    
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+    
+    if (img.src) {
+        try {
+            var color = extractColorFromImage(img);
+            applyDynamicColor(color.r, color.g, color.b);
+            container.style.setProperty('--bg-image', 'url(' + img.src + ')');
+        } catch(e) {}
+    }
+}
+
+function onArtworkError() {
+    var img = document.getElementById('artworkImage');
+    var placeholder = document.getElementById('artworkPlaceholder');
+    img.style.display = 'none';
+    placeholder.style.display = 'block';
+}
+
+// ===== ОСТАЛЬНОЙ JS КОД =====
 var artworkContainer = document.getElementById('artworkContainer');
 var artworkImage = document.getElementById('artworkImage');
 var artworkPlaceholder = document.getElementById('artworkPlaceholder');
@@ -597,6 +649,10 @@ var volumeWaves = document.getElementById('volumeWaves');
 var playlistSection = document.getElementById('playlistSection');
 var playlistHeader = document.getElementById('playlistHeader');
 var trackList = document.getElementById('trackList');
+
+// Добавляем обработчики событий для изображения
+artworkImage.onload = onArtworkLoad;
+artworkImage.onerror = onArtworkError;
 
 var masterTrackList = [];
 var shuffledList = [];
@@ -741,7 +797,7 @@ function init() {
                         end: parsed.end != null ? parsed.end : parsed.start + 240,
                         title: parsed.title,
                         streamTitle: item.title || 'Без названия',
-                        streamDate: item.date || '',
+                        streamDate: item.published_date || '',
                         streamAuthor: item.author || '',
                         thumbnail: 'https://img.youtube.com/vi/' + item.id + '/hqdefault.jpg',
                         url: 'https://www.youtube.com/watch?v=' + item.id + '&t=' + parsed.start + 's',
@@ -760,39 +816,42 @@ function init() {
         .catch(function(e) { console.error(e); });
 }
 
-window.onArtworkLoad = function() {
-    artworkImage.style.display = 'block';
-    artworkPlaceholder.style.display = 'none';
-    if (artworkImage.src && artworkImage.src !== lastArtworkUrl) {
-        lastArtworkUrl = artworkImage.src;
-        try {
-            var color = extractColorFromImage(artworkImage);
-            applyDynamicColor(color.r, color.g, color.b);
-            document.getElementById('playerContainer').style.setProperty('--bg-image', 'url(' + artworkImage.src + ')');
-        } catch(e) {}
-    }
-};
-
-window.onArtworkError = function() {
-    artworkImage.style.display = 'none';
-    artworkPlaceholder.style.display = 'block';
-};
-
 window.onYouTubeIframeAPIReady = function() {
-    player = new YT.Player('ytplayer', {
-        height: '150',
-        width: '200',
-        playerVars: {
-            autoplay: 1,
-            playsinline: 1,
-            mute: 0,
-            rel: 0
-        },
-        events: {
-            onReady: onPlayerReady,
-            onStateChange: onPlayerStateChange
-        }
-    });
+    try {
+        player = new YT.Player('ytplayer', {
+            height: '150',
+            width: '200',
+            playerVars: {
+                autoplay: 1,
+                playsinline: 1,
+                mute: 0,
+                rel: 0,
+                modestbranding: 1,
+                showinfo: 0,
+                controls: 0,
+                origin: window.location.origin
+            },
+            events: {
+                onReady: onPlayerReady,
+                onStateChange: onPlayerStateChange,
+                onError: function(event) {
+                    console.warn('YouTube player error:', event.data);
+                    if (event.data === 100 || event.data === 101 || event.data === 150) {
+                        setTimeout(function() {
+                            if (currentTrack) {
+                                player.loadVideoById({
+                                    videoId: currentTrack.videoId,
+                                    startSeconds: currentTrack.start
+                                });
+                            }
+                        }, 2000);
+                    }
+                }
+            }
+        });
+    } catch(e) {
+        console.warn('YouTube iframe init error:', e);
+    }
 };
 
 function onPlayerReady(event) {
@@ -891,8 +950,9 @@ function playTrackAtIndex(index) {
 }
 
 function updateTrackUI() {
+    var formattedDate = formatDateForDisplay(currentTrack.streamDate);
     setupMarquee(trackTitle, currentTrack.title);
-    setupMarquee(streamInfo, currentTrack.streamTitle + ' \u00b7 ' + currentTrack.streamDate);
+    setupMarquee(streamInfo, currentTrack.streamTitle + ' \u00b7 ' + formattedDate);
     trackAuthor.textContent = currentTrack.streamAuthor ? 'Автор треклиста: ' + currentTrack.streamAuthor : '';
     trackIntegrity.textContent = currentTrack.hasEnd ? '\u2705' : '\u26a0\ufe0f';
     trackIntegrity.title = currentTrack.hasEnd ? 'Треклист имеет начало и конец песни' : 'Треклист не имеет времени конца песни';
@@ -1108,6 +1168,21 @@ document.addEventListener('keydown', function(e) {
     else if (e.code === 'ArrowLeft' && player && playerReady) { e.preventDefault(); player.seekTo(Math.max(currentTrack ? currentTrack.start : 0, player.getCurrentTime() - 5), true); }
     else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
 });
+
+var scrollBtn = document.getElementById('scrollTopBtn');
+window.addEventListener('scroll', function() { 
+    if (window.scrollY > 300) {
+        if (scrollBtn) scrollBtn.classList.add('show');
+    } else {
+        if (scrollBtn) scrollBtn.classList.remove('show');
+    }
+}, { passive: true });
+
+if (scrollBtn) {
+    scrollBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
 
 if (typeof YT !== 'undefined' && YT.Player) window.onYouTubeIframeAPIReady();
 window.addEventListener('load', init);

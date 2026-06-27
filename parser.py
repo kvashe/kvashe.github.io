@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Парсер треклистов YouTube-трансляций
+Оптимизированная версия с dataclass, единым API-клиентом, Retry-адаптером и вынесенными HTML-шаблонами
+"""
+
 import os
 import re
 import json
@@ -9,10 +17,15 @@ import argparse
 import logging
 import time
 import html
+from dataclasses import dataclass, asdict
+from typing import List, Optional, Dict, Set, Tuple, Any
+from datetime import date
 from yt_dlp import YoutubeDL
 from concurrent.futures import ThreadPoolExecutor
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-# ==================== ИСХОДНЫЕ НАСТРОЙКИ ====================
+# ==================== КОНСТАНТЫ ====================
 API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 CHANNEL_STREAMS_URL = 'https://www.youtube.com/@kvashenaya/streams'
 DB_FILE = "parsed_streams_db.json"
@@ -30,17 +43,247 @@ DEBUG = True
 SITE_URL = "https://kvashe.github.io"
 LAST_SPONSOR_CHECK_FILE = "last_sponsor_check.txt"
 
-# ===== 1. Скомпилированная регулярка =====
+# ===== Скомпилированные регулярки =====
 TIMECODE_RE = re.compile(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b')
+DASH_RE = re.compile(r'[-–—]')
+DASH_PREFIX_RE = re.compile(r'^\s*[-–—]\s*')
+NON_WORD_RE = re.compile(r'[^\w\sа-яА-ЯёЁA-Za-z]')
+BAD_WORDS_RE = re.compile(r'\b(?:стрим|волос|сигна|говорит|чат|вопрос|talking|спросить|умница|красив)\b', re.IGNORECASE)
+LETTERS_RE = re.compile(r'[A-Za-z]')
+DURATION_RE = re.compile(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
 
-# ===== 2. Сессия requests =====
-SESSION = requests.Session()
-
-FORBIDDEN_PHRASES = [
+# ===== Оптимизированные списки для проверок =====
+FORBIDDEN_PHRASES = (
     "хватит брать высокие ноты",
     "пой без кривляний",
     "но вот играть на ней ты явно неумеешь",
-]
+)
+FORBIDDEN_PHRASES_LOWER = tuple(p.lower() for p in FORBIDDEN_PHRASES)
+
+SPECIAL_ALLOWED = (
+    "титры", "интро", "начало", "конец", "финал",
+    "донаты", "розыгрыш", "чат", "сигн",
+    "вступление", "intro", "outro", "припев", "куплет"
+)
+
+BANNED_WORDS = (
+    "привет", "ага", "сегодня", "ладно", "понятно", "ок", "ну", "блин"
+)
+
+# ===== Сессия requests с Retry =====
+SESSION = requests.Session()
+
+# Настраиваем Retry стратегию
+retry_strategy = Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"]
+)
+
+adapter = HTTPAdapter(max_retries=retry_strategy)
+SESSION.mount("https://", adapter)
+SESSION.mount("http://", adapter)
+
+# ==================== DATACLASS ====================
+@dataclass(slots=True)
+class VideoData:
+    """Модель данных для видео с треклистом"""
+    id: str
+    title: str
+    published_date: date
+    timecodes: List[str]
+    list_type: str
+    author: str
+    duration: int
+    is_sponsor: bool = False
+
+    def to_dict(self) -> dict:
+        """Преобразует объект в словарь для JSON сериализации"""
+        data = asdict(self)
+        data['published_date'] = self.published_date.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'VideoData':
+        """Создает объект из словаря"""
+        if 'published_date' in data:
+            if isinstance(data['published_date'], str):
+                data['published_date'] = datetime.datetime.fromisoformat(data['published_date']).date()
+            elif isinstance(data['published_date'], date):
+                pass
+        return cls(**data)
+    
+    def get_formatted_date(self) -> str:
+        """Возвращает дату в формате DD.MM.YYYY для отображения"""
+        return self.published_date.strftime("%d.%m.%Y")
+
+@dataclass(slots=True)
+class ParsedTimecode:
+    """Модель для парсинга одной строки таймкода"""
+    start: int
+    end: Optional[int]
+    title: str
+    raw: str
+
+# ==================== YOUTUBE API КЛИЕНТ ====================
+class YouTubeAPI:
+    """Единый клиент для работы с YouTube API"""
+    
+    BASE_URL = "https://www.googleapis.com/youtube/v3/"
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.session = SESSION
+    
+    def _request(self, endpoint: str, params: dict, timeout: int = 10) -> dict:
+        """Базовый метод для всех API-запросов"""
+        params["key"] = self.api_key
+        
+        try:
+            resp = self.session.get(
+                self.BASE_URL + endpoint,
+                params=params,
+                timeout=timeout
+            )
+            
+            if resp.status_code == 403:
+                logging.warning("Quota exceeded или доступ запрещён для %s", endpoint)
+                return {}
+            
+            resp.raise_for_status()
+            return resp.json()
+            
+        except requests.exceptions.Timeout:
+            logging.error("Таймаут запроса к %s", endpoint)
+            return {}
+        except requests.exceptions.RequestException as e:
+            logging.error("Ошибка API при запросе к %s: %s", endpoint, e)
+            return {}
+    
+    def get_videos_info(self, video_ids: List[str]) -> Dict[str, dict]:
+        """Получает информацию о видео одним запросом"""
+        if not video_ids:
+            return {}
+        
+        all_info = {}
+        total_batches = (len(video_ids) + 49) // 50
+        
+        for i in range(0, len(video_ids), 50):
+            batch = video_ids[i:i+50]
+            batch_num = i // 50 + 1
+            
+            logging.debug("Получение информации для batch %d/%d (%d видео)...", batch_num, total_batches, len(batch))
+            
+            data = self._request(
+                "videos",
+                {
+                    "part": "snippet,contentDetails,statistics",
+                    "id": ",".join(batch)
+                }
+            )
+            
+            if not data:
+                logging.warning("Не удалось получить информацию для batch %d", batch_num)
+                continue
+            
+            for item in data.get("items", []):
+                video_id = item["id"]
+                
+                published_at = item.get("snippet", {}).get("publishedAt", "")
+                if published_at:
+                    published_date = datetime.datetime.fromisoformat(published_at.replace('Z', '+00:00')).date()
+                else:
+                    published_date = date(1970, 1, 1)
+                
+                duration_iso = item.get("contentDetails", {}).get("duration", "")
+                duration = 0
+                if duration_iso:
+                    match = DURATION_RE.match(duration_iso)
+                    if match:
+                        h = int(match.group(1) or 0)
+                        m = int(match.group(2) or 0)
+                        s = int(match.group(3) or 0)
+                        duration = h*3600 + m*60 + s
+                
+                stats = item.get("statistics", {})
+                is_sponsor = "viewCount" not in stats
+                
+                all_info[video_id] = {
+                    "published_date": published_date,
+                    "duration": duration,
+                    "is_sponsor": is_sponsor,
+                    "available": not is_sponsor
+                }
+                
+                logging.debug("✅ %s: дата=%s, длит=%dс, спонсор=%s", 
+                             video_id, published_date, duration, is_sponsor)
+            
+            returned_ids = {item["id"] for item in data.get("items", [])}
+            missing = set(batch) - returned_ids
+            if missing:
+                logging.debug("❌ %d видео отсутствуют в ответе API (удалены или недоступны)", len(missing))
+        
+        return all_info
+    
+    def get_comments(self, video_id: str, max_comments: int = 3000) -> List[dict]:
+        """Получает комментарии к видео"""
+        comments = []
+        page_token = None
+
+        while len(comments) < max_comments:
+            data = self._request(
+                "commentThreads",
+                {
+                    "videoId": video_id,
+                    "part": "snippet",
+                    "maxResults": 100,
+                    "textFormat": "plainText",
+                    "pageToken": page_token
+                }
+            )
+            
+            if not data:
+                logging.warning("Не удалось получить комментарии для %s", video_id)
+                break
+
+            if "error" in data:
+                break
+
+            for item in data.get("items", []):
+                snippet = item["snippet"]["topLevelComment"]["snippet"]
+                published_at = snippet.get("publishedAt", "")
+                
+                timestamp = 9999999999
+                if published_at:
+                    try:
+                        timestamp = datetime.datetime.fromisoformat(
+                            published_at.replace('Z', '+00:00')
+                        ).timestamp()
+                    except:
+                        pass
+                
+                comments.append({
+                    "text": snippet.get("textDisplay", ""),
+                    "author": snippet.get("authorDisplayName", ""),
+                    "is_pinned": False,
+                    "published_at": published_at,
+                    "timestamp": timestamp
+                })
+            
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+        
+        return comments
+    
+    def check_sponsors(self, video_ids: List[str]) -> Set[str]:
+        """Проверяет пачку видео на спонсорство"""
+        if not video_ids:
+            return set()
+        
+        video_info = self.get_videos_info(video_ids)
+        return {vid for vid, info in video_info.items() if info.get("available", False)}
 
 # ==================== НАСТРОЙКА ЛОГИРОВАНИЯ ====================
 def setup_logging(debug):
@@ -70,202 +313,34 @@ def parse_args():
 # ==================== РАБОТА С БАЗОЙ ====================
 db_lock = threading.Lock()
 
-def load_database(db_file):
+def load_database(db_file) -> Dict[str, VideoData]:
     if not os.path.exists(db_file):
         return {}
     try:
         with open(db_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, list):
-            return {item['id']: item for item in data if 'id' in item}
+            return {item['id']: VideoData.from_dict(item) for item in data if 'id' in item}
         elif isinstance(data, dict):
-            return data
+            return {vid: VideoData.from_dict(item) for vid, item in data.items()}
         else:
             return {}
     except (json.JSONDecodeError, Exception) as e:
         logging.warning("Ошибка чтения базы (%s). Будет создана новая.", e)
         return {}
 
-def save_database(db, db_file):
+def save_database(db: Dict[str, VideoData], db_file):
     with db_lock:
-        sorted_items = sorted(db.values(), key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+        sorted_items = sorted(db.values(), key=lambda x: x.published_date, reverse=True)
         tmp_file = db_file + ".tmp"
         try:
             with open(tmp_file, "w", encoding="utf-8") as f:
-                json.dump(sorted_items, f, ensure_ascii=False, indent=2)
+                json.dump([item.to_dict() for item in sorted_items], f, ensure_ascii=False, indent=2)
             os.replace(tmp_file, db_file)
         except Exception as e:
             logging.error("Ошибка сохранения базы: %s", e)
             if os.path.exists(tmp_file):
                 os.unlink(tmp_file)
-
-# ==================== API YOUTUBE ====================
-def get_video_comments_via_api(video_id, api_key, max_comments=3000):
-    comments = []
-    page_token = None
-    retries = 0
-    max_retries = 5
-
-    while len(comments) < max_comments:
-        params = {
-            "key": api_key,
-            "part": "snippet",
-            "videoId": video_id,
-            "maxResults": 100,
-            "textFormat": "plainText",
-        }
-        if page_token:
-            params["pageToken"] = page_token
-
-        try:
-            resp = SESSION.get("https://www.googleapis.com/youtube/v3/commentThreads", params=params)
-            if resp.status_code == 403:
-                logging.warning("Quota exceeded for %s", video_id)
-                break
-            if resp.status_code == 429:
-                retries += 1
-                if retries > max_retries:
-                    break
-                time.sleep(2 ** retries)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            logging.error("API error for %s: %s", video_id, e)
-            break
-
-        if "error" in data:
-            break
-
-        for item in data.get("items", []):
-            snippet = item["snippet"]["topLevelComment"]["snippet"]
-            comments.append({
-                "text": snippet.get("textDisplay", ""),
-                "author": snippet.get("authorDisplayName", ""),
-                "is_pinned": False,
-                "published_at": snippet.get("publishedAt", "")
-            })
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
-    return comments
-
-def check_sponsor_batch(video_ids, api_key):
-    """
-    Проверяет пачку видео одним запросом.
-    Видео НЕ спонсорское если: в ответе есть statistics.viewCount.
-    Если viewCount отсутствует - видео спонсорское.
-    """
-    if not video_ids:
-        return set()
-    
-    available_videos = set()
-    total_batches = (len(video_ids) + 49) // 50
-    
-    for i in range(0, len(video_ids), 50):
-        batch = video_ids[i:i+50]
-        batch_num = i // 50 + 1
-        
-        logging.info(
-            "Проверка batch %d/%d (%d видео)...",
-            batch_num,
-            total_batches,
-            len(batch)
-        )
-        
-        for attempt in range(2):
-            try:
-                resp = SESSION.get(
-                    "https://www.googleapis.com/youtube/v3/videos",
-                    params={
-                        "key": api_key,
-                        "part": "statistics",
-                        "id": ",".join(batch)
-                    },
-                    timeout=10
-                )
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    items = data.get("items", [])
-                    returned_ids = {item["id"] for item in items}
-                    
-                    public_count = 0
-                    sponsor_count = 0
-                    
-                    for item in items:
-                        video_id = item["id"]
-                        stats = item.get("statistics", {})
-                        
-                        # Ключевая проверка: наличие viewCount
-                        if "viewCount" in stats:
-                            available_videos.add(video_id)
-                            public_count += 1
-                            logging.debug(
-                                "✅ %s: viewCount=%s (доступно)",
-                                video_id,
-                                stats["viewCount"]
-                            )
-                        else:
-                            sponsor_count += 1
-                            logging.debug(
-                                "❌ %s: viewCount отсутствует (спонсорское)",
-                                video_id
-                            )
-                    
-                    # Видео, которые не вернулись в ответе
-                    missing = set(batch) - returned_ids
-                    if missing:
-                        logging.debug(
-                            "❌ %d видео отсутствуют в ответе API (удалены или недоступны)",
-                            len(missing)
-                        )
-                    
-                    logging.info(
-                        "Batch %d/%d: доступно=%d, спонсорских=%d, отсутствуют=%d",
-                        batch_num,
-                        total_batches,
-                        public_count,
-                        sponsor_count,
-                        len(missing)
-                    )
-                    
-                    break
-                    
-                elif resp.status_code == 403:
-                    logging.warning("Доступ запрещён для batch запроса %d/%d", batch_num, total_batches)
-                    break
-                    
-            except Exception as e:
-                logging.warning(
-                    "Ошибка batch %d/%d проверки (попытка %d): %s",
-                    batch_num,
-                    total_batches,
-                    attempt + 1,
-                    e
-                )
-                if attempt == 0:
-                    time.sleep(2)
-    
-    return available_videos
-
-def get_video_duration(video_id, api_key):
-    try:
-        resp = SESSION.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params={"key": api_key, "part": "contentDetails", "id": video_id}
-        ).json()
-        if "items" in resp and resp["items"]:
-            duration_iso = resp["items"][0]["contentDetails"]["duration"]
-            match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration_iso)
-            if match:
-                h = int(match.group(1) or 0)
-                m = int(match.group(2) or 0)
-                s = int(match.group(3) or 0)
-                return h*3600 + m*60 + s
-    except Exception as e:
-        logging.warning("Не удалось получить длительность для %s: %s", video_id, e)
-    return 0
 
 # ==================== ПРОВЕРКА СПОНСОРСКИХ ВИДЕО ====================
 def should_run_sponsor_check():
@@ -288,99 +363,126 @@ def update_sponsor_check_date():
     with open(LAST_SPONSOR_CHECK_FILE, "w", encoding="utf-8") as f:
         f.write(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"))
 
-# ==================== ЛОГИКА ИЗВЛЕЧЕНИЯ ТАЙМКОДОВ ====================
-def get_timecode_seconds(line):
-    match = TIMECODE_RE.search(line)
-    if match:
-        time_str = match.group(0)
-        parts = [int(p) for p in time_str.split(':')]
-        if len(parts) == 2:
-            return parts[0] * 60 + parts[1]
-        elif len(parts) == 3:
-            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+# ==================== ПАРСИНГ ТАЙМКОДОВ ====================
+def timecode_to_seconds(time_str: str) -> int:
+    parts = [int(p) for p in time_str.split(':')]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    elif len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
     return 99999999
 
-def parse_timecode_range(line):
+def parse_timecode(line: str) -> Optional[ParsedTimecode]:
     matches = list(TIMECODE_RE.finditer(line))
     if not matches:
-        return None, None, line.strip()
-    start_match = matches[0]
-    start_sec = get_timecode_seconds(line[start_match.start():start_match.end()])
+        return None
+    
+    first = matches[0]
+    start_sec = timecode_to_seconds(first.group(0))
+    
+    end_sec = None
+    title = line[:first.start()] + line[first.end():]
+    
     if len(matches) >= 2:
-        between = line[start_match.end():matches[1].start()]
-        if re.search(r'[-–—]', between):
-            end_sec = get_timecode_seconds(line[matches[1].start():matches[1].end()])
-            title = line[:start_match.start()] + line[matches[1].end():]
-            title = re.sub(r'^\s*[-–—]\s*', '', title).strip()
-            return start_sec, end_sec, title
-    title = line[:start_match.start()] + line[start_match.end():]
+        second = matches[1]
+        between = line[first.end():second.start()]
+        if DASH_RE.search(between):
+            end_sec = timecode_to_seconds(second.group(0))
+            if end_sec > start_sec:
+                title = line[:first.start()] + line[second.end():]
+                title = DASH_PREFIX_RE.sub('', title).strip()
+    
     title = title.strip()
-    return start_sec, None, title
+    
+    return ParsedTimecode(
+        start=start_sec,
+        end=end_sec,
+        title=title,
+        raw=line
+    )
 
-def is_transcript_like(lines, min_gap):
-    times = [get_timecode_seconds(l) for l in lines if get_timecode_seconds(l) != 99999999]
-    if len(times) < 5:
+def is_transcript_like(parsed_list: List[ParsedTimecode], min_gap: int) -> bool:
+    if len(parsed_list) < 5:
         return False
+    
+    times = [p.start for p in parsed_list]
     deltas = [times[i+1] - times[i] for i in range(len(times)-1) if times[i+1] > times[i]]
+    
     if not deltas:
         return False
+    
     return (sum(deltas) / len(deltas)) < min_gap
 
-def is_good_timecode_line(line, min_words, max_words):
-    match = TIMECODE_RE.search(line)
-    if not match:
-        return False
-    after_time = line[match.end():].strip()
+def is_good_timecode_line_parsed(parsed: ParsedTimecode, min_words: int, max_words: int) -> bool:
+    after_time = parsed.title
     if not after_time:
         return False
-    clean_after = re.sub(r'[^\w\sа-яА-ЯёЁA-Za-z]', ' ', after_time)
+    
+    clean_after = NON_WORD_RE.sub(' ', after_time)
     words = clean_after.split()
     word_count = len(words)
+    
     effective_max = 50 if ' - ' in after_time else max_words
-    special_allowed = ["титры", "интро", "начало", "конец", "финал",
-                       "донаты", "розыгрыш", "чат", "сигн",
-                       "вступление", "intro", "outro", "припев", "куплет"]
+    
     lower_after = after_time.lower()
+    
     if word_count < min_words:
-        if not any(word in lower_after for word in special_allowed):
+        if not any(word in lower_after for word in SPECIAL_ALLOWED):
             return False
+    
     if word_count > effective_max:
         return False
-    banned_words = ["привет", "ага", "сегодня", "ладно", "понятно", "ок", "ну", "блин"]
-    if lower_after in banned_words:
+    
+    if lower_after in BANNED_WORDS:
         return False
+    
     return True
 
 def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_gap, debug):
     candidates = []
-    mixed_lines = []
+    mixed_parsed = []
     mixed_authors = set()
 
     for comment in comments:
         text = comment.get('text', '')
         text_lower = text.lower()
-        if any(phrase.lower() in text_lower for phrase in FORBIDDEN_PHRASES):
+        
+        if any(p in text_lower for p in FORBIDDEN_PHRASES_LOWER):
             continue
 
-        all_lines = [line.strip() for line in text.split('\n') if TIMECODE_RE.search(line)]
-        if not all_lines:
+        lines = [line.strip() for line in text.split('\n')]
+        parsed_lines = []
+        
+        for line in lines:
+            parsed = parse_timecode(line)
+            if parsed:
+                parsed_lines.append(parsed)
+        
+        if not parsed_lines:
             continue
 
-        valid_lines = [line for line in all_lines if is_good_timecode_line(line, min_words, max_words)]
-        tc_count = len(valid_lines)
+        valid_parsed = [
+            p for p in parsed_lines 
+            if is_good_timecode_line_parsed(p, min_words, max_words)
+        ]
+        
+        tc_count = len(valid_parsed)
 
         if tc_count >= min_timecodes:
-            if is_transcript_like(valid_lines, min_gap):
+            if is_transcript_like(valid_parsed, min_gap):
                 continue
 
             music_score = 0
-            for line in valid_lines:
-                if ' - ' in line: music_score += 3
-                if re.search(r'[A-Za-z]', line): music_score += 1
-                if '(' in line or ')' in line: music_score += 1
-                bad_words = ['стрим', 'волос', 'сигна', 'говорит', 'чат', 'вопрос',
-                             'talking', 'спросить', 'умница', 'красив']
-                if any(w in line.lower() for w in bad_words): music_score -= 2
+            for p in valid_parsed:
+                if ' - ' in p.title:
+                    music_score += 3
+                if LETTERS_RE.search(p.title):
+                    music_score += 1
+                if '(' in p.title or ')' in p.title:
+                    music_score += 1
+                
+                if BAD_WORDS_RE.search(p.title.lower()):
+                    music_score -= 2
 
             author = comment.get('author', 'Неизвестно')
             if author in ("@ajoajo701", "@mirovoy100"):
@@ -388,52 +490,54 @@ def extract_smart_timecodes(comments, min_timecodes, min_words, max_words, min_g
 
             candidates.append({
                 'text': text,
-                'valid_lines': valid_lines,
+                'valid_parsed': valid_parsed,
                 'tc_count': tc_count,
                 'music_score': music_score,
                 'author': author,
-                'published_at': comment.get('published_at', '')
+                'timestamp': comment.get('timestamp', 9999999999)
             })
         else:
-            mixed_lines.extend(valid_lines)
+            mixed_parsed.extend(valid_parsed)
             mixed_authors.add(comment.get('author', 'Неизвестно'))
 
     if candidates:
-        def _ts(date_str):
-            try:
-                return datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00')).timestamp()
-            except:
-                return 9999999999
-        best = max(candidates, key=lambda c: (c['music_score'], c['tc_count'], -_ts(c.get('published_at', ''))))
+        best = max(candidates, key=lambda c: (c['music_score'], c['tc_count'], -c['timestamp']))
+        
         dedup = {}
-        for line in best['valid_lines']:
-            sec = get_timecode_seconds(line)
-            if sec not in dedup:
-                dedup[sec] = line
-        sorted_lines = sorted(dedup.values(), key=get_timecode_seconds)
-        return sorted_lines, "tracklist", best['author']
+        for p in best['valid_parsed']:
+            if p.start not in dedup:
+                dedup[p.start] = p
+        
+        sorted_parsed = sorted(dedup.values(), key=lambda x: x.start)
+        timecode_strings = [p.raw for p in sorted_parsed]
+        
+        return timecode_strings, "tracklist", best['author']
 
-    if mixed_lines:
+    if mixed_parsed:
         dedup_mixed = {}
-        for line in mixed_lines:
-            sec = get_timecode_seconds(line)
-            if sec not in dedup_mixed:
-                dedup_mixed[sec] = line
-        unique_lines = sorted(dedup_mixed.values(), key=get_timecode_seconds)
+        for p in mixed_parsed:
+            if p.start not in dedup_mixed:
+                dedup_mixed[p.start] = p
+        
+        sorted_parsed = sorted(dedup_mixed.values(), key=lambda x: x.start)
+        timecode_strings = [p.raw for p in sorted_parsed]
+        
         authors_str = ", ".join(list(mixed_authors)[:3])
         if len(mixed_authors) > 3:
             authors_str += " и др."
-        return unique_lines, "mixed", authors_str
+        
+        return timecode_strings, "mixed", authors_str
 
     return [], "none", ""
 
 # ==================== ПАРСИНГ ОДНОГО ВИДЕО ====================
-def parse_single_video(video_entry, api_key, db, args):
+def parse_single_video(video_entry, video_info: dict, db: Dict[str, VideoData], args, youtube: YouTubeAPI):
+    """Парсит одно видео, используя уже полученную информацию о нем"""
     video_id = video_entry['id']
     title = video_entry.get('title', 'No Title')
     logging.info("Парсинг: %s...", title[:60])
 
-    comments = get_video_comments_via_api(video_id, api_key)
+    comments = youtube.get_comments(video_id)
     timecodes, list_type, author = extract_smart_timecodes(
         comments, args.min_timecodes, args.min_words, args.max_words, args.min_gap, args.debug
     )
@@ -441,92 +545,223 @@ def parse_single_video(video_entry, api_key, db, args):
     if args.force_author:
         author = args.force_author
 
-    raw_date = video_entry.get('raw_date', '00000000')
-    if raw_date == '00000000':
-        try:
-            video_resp = SESSION.get(
-                "https://www.googleapis.com/youtube/v3/videos",
-                params={"key": api_key, "part": "snippet", "id": video_id}
-            ).json()
-            if "items" in video_resp and video_resp["items"]:
-                published_at = video_resp["items"][0]["snippet"]["publishedAt"]
-                raw_date = published_at[:10].replace("-", "")
-        except Exception as e:
-            logging.warning("Не удалось получить дату для %s: %s", video_id, e)
+    info = video_info.get(video_id, {})
+    published_date = info.get("published_date", date(1970, 1, 1))
+    duration = info.get("duration", 0)
+    is_sponsor = info.get("is_sponsor", False)
 
-    duration = get_video_duration(video_id, api_key)
-
-    formatted_date = f"{raw_date[6:8]}.{raw_date[4:6]}.{raw_date[0:4]}" if len(raw_date) == 8 else "Неизвестно"
-
-    video_data = {
-        "id": video_id,
-        "title": title,
-        "date": formatted_date,
-        "raw_date": raw_date,
-        "timecodes": timecodes,
-        "list_type": list_type,
-        "author": author,
-        "duration": duration,
-        "is_sponsor": False
-    }
+    video_data = VideoData(
+        id=video_id,
+        title=title,
+        published_date=published_date,
+        timecodes=timecodes,
+        list_type=list_type,
+        author=author,
+        duration=duration,
+        is_sponsor=is_sponsor
+    )
+    
     with db_lock:
         db[video_id] = video_data
+    
     logging.info("Сохранено: %s... (%s) автор=%s, треков=%d, длит=%s",
-                 title[:50], formatted_date, author, len(timecodes),
+                 title[:50], published_date.strftime("%d.%m.%Y"), author, len(timecodes),
                  str(datetime.timedelta(seconds=duration)) if duration else "неизв")
     return True
 
-# ==================== ГЕНЕРАЦИЯ СТРАНИЦ ====================
-def generate_sitemap(site_url):
-    pages = [
-        {"loc": f"{site_url}/index.html", "priority": "1.0"},
-        {"loc": f"{site_url}/tracklists.html", "priority": "0.8"},
-        {"loc": f"{site_url}/player.html", "priority": "0.7"},
-    ]
-    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for p in pages:
-        xml.append(f"  <url><loc>{p['loc']}</loc><priority>{p['priority']}</priority></url>")
-    xml.append("</urlset>")
-    with open("sitemap.xml", "w", encoding="utf-8") as f:
-        f.write("\n".join(xml))
-    logging.info("Sitemap создан: %s", os.path.abspath("sitemap.xml"))
+# ==================== ГЕНЕРАЦИЯ HTML-ОТЧЕТОВ ====================
+def generate_html_report(db: Dict[str, VideoData], site_url, output_html, tracklists_html, player_html_path):
+    logging.info("Генерация HTML-отчётов...")
 
-def generate_html_report(db, site_url, output_html, tracklists_html, player_html_path):
-    logging.info("Генерация HTML-отчётов и плеера...")
-
-    # Проверяем, есть ли спонсорские видео в базе
-    has_sponsor_videos = any(
-        item.get("is_sponsor", False) 
-        for item in db.values() 
-        if item.get('list_type') in ('tracklist', 'mixed')
-    )
-
-    # ---------- SEO-страница ----------
     streams_for_seo = [
         item for item in db.values()
-        if item.get('list_type') in ('tracklist', 'mixed') and item.get('timecodes')
+        if item.list_type in ('tracklist', 'mixed') and item.timecodes
     ]
-    streams_for_seo.sort(key=lambda x: x.get("raw_date", "00000000"), reverse=True)
+    streams_for_seo.sort(key=lambda x: x.published_date, reverse=True)
+    
     seo_lines = [
         '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">',
-        '<title>Архив треклистов Квашеной – все треклисты</title></head><body>',
+        '<title>Архив треклистов Квашеной – все треклисты</title>',
+        '<meta name="robots" content="index, follow">',
+        '</head><body>',
         '<h1>Все треклисты трансляций Квашеной</h1>'
     ]
     for stream in streams_for_seo:
-        title = html.escape(stream.get('title', 'Без названия'))
-        date = html.escape(stream.get('date', ''))
+        title = html.escape(stream.title)
+        date = html.escape(stream.get_formatted_date())
         seo_lines.append(f'<h2>{title} ({date})</h2><ul>')
-        for line in stream.get('timecodes', []):
+        for line in stream.timecodes:
             seo_lines.append(f'<li>{html.escape(line)}</li>')
         seo_lines.append('</ul>')
     seo_lines.append('</body></html>')
+    
     with open(tracklists_html, 'w', encoding='utf-8') as f:
         f.write('\n'.join(seo_lines))
     logging.info("SEO-страница создана: %s", os.path.abspath(tracklists_html))
 
-    # ---------- Страница плеера ----------
-    player_html = r'''<!DOCTYPE html>
+    with open(player_html_path, 'w', encoding='utf-8') as f:
+        f.write(PLAYER_TEMPLATE)
+    logging.info("player.html создан: %s", os.path.abspath(player_html_path))
+
+    safe_site_url = html.escape(site_url)
+    index_html = INDEX_TEMPLATE.replace('{site_url}', safe_site_url)
+    index_html = minify_html(index_html)
+    
+    with open(output_html, 'w', encoding='utf-8') as f:
+        f.write(index_html)
+    logging.info("HTML обновлён: %s", os.path.abspath(output_html))
+
+    with open("sitemap.xml", "w", encoding="utf-8") as f:
+        f.write(SITEMAP_TEMPLATE.format(site_url=safe_site_url))
+    logging.info("Sitemap создан: %s", os.path.abspath("sitemap.xml"))
+
+def minify_html(html_content: str) -> str:
+    html_content = re.sub(r'<!--.*?-->', '', html_content, flags=re.DOTALL)
+    html_content = re.sub(r'>\s+<', '><', html_content)
+    html_content = re.sub(r'\s{2,}', ' ', html_content)
+    return html_content.strip()
+
+# ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
+def run_parser():
+    args = parse_args()
+    debug_mode = args.debug if args.debug is not None else DEBUG
+    setup_logging(debug_mode)
+
+    api_key = args.api_key
+    if not api_key:
+        logging.error("API-ключ YouTube не указан. Задайте --api-key или переменную YOUTUBE_API_KEY")
+        sys.exit(1)
+
+    youtube = YouTubeAPI(api_key)
+    
+    db = load_database(args.db)
+    is_first_run = len(db) == 0
+
+    flat_opts = {
+        'playlistend': None if is_first_run else args.new_streams,
+        'extract_flat': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+    try:
+        with YoutubeDL(flat_opts) as ydl:
+            logging.info("Получение списка трансляций через yt-dlp...")
+            channel_data = ydl.extract_info(args.channel, download=False)
+            if not channel_data or 'entries' not in channel_data:
+                logging.error("Не удалось получить список стримов.")
+                return
+
+            videos_to_parse = []
+            videos_to_fix_date = []
+            for entry in channel_data['entries']:
+                if not entry:
+                    continue
+                video_id = entry.get('id')
+                if not video_id:
+                    continue
+                if video_id in db:
+                    if db[video_id].published_date == date(1970, 1, 1):
+                        videos_to_fix_date.append(video_id)
+                    continue
+                videos_to_parse.append({
+                    'id': video_id,
+                    'title': entry.get('title', 'Без названия'),
+                })
+
+        if videos_to_fix_date:
+            logging.info("Восстановление дат для %d существующих треклистов...", len(videos_to_fix_date))
+            video_info = youtube.get_videos_info(videos_to_fix_date)
+            
+            for video_id in videos_to_fix_date:
+                if video_id in video_info:
+                    info = video_info[video_id]
+                    published_date = info.get("published_date", date(1970, 1, 1))
+                    if published_date != date(1970, 1, 1):
+                        with db_lock:
+                            if video_id in db:
+                                db[video_id].published_date = published_date
+                                logging.info("Дата обновлена для %s: %s", video_id, published_date.strftime("%d.%m.%Y"))
+            save_database(db, args.db)
+
+        if videos_to_parse:
+            logging.info("Парсинг %d видео...", len(videos_to_parse))
+            
+            video_ids = [v["id"] for v in videos_to_parse]
+            logging.info("Получение информации о %d видео одним запросом...", len(video_ids))
+            all_video_info = youtube.get_videos_info(video_ids)
+
+            def worker(video):
+                parse_single_video(video, all_video_info, db, args, youtube)
+
+            chunksize = max(1, min(10, len(videos_to_parse) // (args.max_workers * 2)))
+            logging.info("Используем chunksize=%d для %d видео", chunksize, len(videos_to_parse))
+            
+            with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+                executor.map(worker, videos_to_parse, chunksize=chunksize)
+
+            save_database(db, args.db)
+
+        if should_run_sponsor_check():
+            logging.info("Запуск ежемесячной проверки спонсорских видео")
+
+            videos_to_check = [
+                video_id for video_id, video_data in db.items()
+                if video_data.list_type in ("tracklist", "mixed")
+            ]
+            
+            logging.info("Найдено %d видео с треклистами в базе", len(videos_to_check))
+            
+            if videos_to_check:
+                available_videos = youtube.check_sponsors(videos_to_check)
+                
+                logging.info("API вернул %d доступных видео из %d запрошенных",
+                           len(available_videos), len(videos_to_check))
+                
+                sponsors_found = 0
+                already_sponsored = 0
+                still_available = 0
+                
+                for video_id in videos_to_check:
+                    if video_id in available_videos:
+                        if db[video_id].is_sponsor:
+                            logging.info("Видео перестало быть спонсорским: %s", db[video_id].title)
+                        db[video_id].is_sponsor = False
+                        still_available += 1
+                    else:
+                        if not db[video_id].is_sponsor:
+                            sponsors_found += 1
+                            logging.info("Видео стало спонсорским: %s", db[video_id].title)
+                        else:
+                            already_sponsored += 1
+                        db[video_id].is_sponsor = True
+                
+                update_sponsor_check_date()
+                
+                logging.info("Результаты проверки: доступно=%d, стало спонсорскими=%d, уже были спонсорскими=%d",
+                           still_available, sponsors_found, already_sponsored)
+            else:
+                logging.info("Нет видео для проверки")
+        else:
+            logging.info("Ежемесячная проверка спонсорских видео не требуется (прошло меньше 30 дней)")
+
+        save_database(db, args.db)
+
+        logging.info("Генерация отчётов и плеера...")
+        generate_html_report(db, args.site_url, args.output, args.tracklists, args.player)
+
+    except Exception as e:
+        logging.exception("Критическая ошибка")
+        sys.exit(1)
+
+# ==================== ШАБЛОНЫ HTML ====================
+SITEMAP_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{site_url}/index.html</loc><priority>1.0</priority></url>
+  <url><loc>{site_url}/tracklists.html</loc><priority>0.8</priority></url>
+  <url><loc>{site_url}/player.html</loc><priority>0.7</priority></url>
+</urlset>"""
+
+PLAYER_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -1014,7 +1249,7 @@ def generate_html_report(db, site_url, output_html, tracklists_html, player_html
 <div class="container" id="playerContainer">
     <div class="artwork-container" id="artworkContainer">
         <div class="artwork-placeholder" id="artworkPlaceholder"></div>
-        <img class="artwork-image" id="artworkImage" src="" alt="Обложка видео" style="display:none;" onload="onArtworkLoad()" onerror="onArtworkError()">
+        <img class="artwork-image" id="artworkImage" src="" alt="Обложка видео" style="display:none;">
         <div class="artwork-overlay">
             <div class="play-icon-overlay">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -1087,17 +1322,69 @@ def generate_html_report(db, site_url, output_html, tracklists_html, player_html
         </a>
     </div>
 </div>
-<div id="ytplayer"
-     style="
-        position:absolute;
-        width:1px;
-        height:1px;
-        opacity:0.01;
-        pointer-events:none;
-     ">
-</div>
+<div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
+function formatDateForDisplay(dateStr) {
+    try {
+        if (!dateStr) return '';
+        // Если дата уже в формате DD.MM.YYYY, возвращаем как есть
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return dateStr;
+        
+        // Пробуем распарсить ISO формат (YYYY-MM-DD)
+        var parts = dateStr.split('-');
+        if (parts.length === 3) {
+            var year = parts[0];
+            var month = parts[1];
+            var day = parts[2];
+            // Проверяем, что это валидные числа
+            if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                return day + '.' + month + '.' + year;
+            }
+        }
+        
+        // Пробуем распарсить через Date
+        var date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            var d = String(date.getDate()).padStart(2, '0');
+            var m = String(date.getMonth() + 1).padStart(2, '0');
+            var y = date.getFullYear();
+            return d + '.' + m + '.' + y;
+        }
+        
+        return dateStr;
+    } catch(e) {
+        return dateStr || '';
+    }
+}
+
+// ===== ФУНКЦИИ ДЛЯ ОБЛОЖКИ =====
+function onArtworkLoad() {
+    var img = document.getElementById('artworkImage');
+    var placeholder = document.getElementById('artworkPlaceholder');
+    var container = document.getElementById('playerContainer');
+    
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+    
+    if (img.src) {
+        try {
+            var color = extractColorFromImage(img);
+            applyDynamicColor(color.r, color.g, color.b);
+            container.style.setProperty('--bg-image', 'url(' + img.src + ')');
+        } catch(e) {}
+    }
+}
+
+function onArtworkError() {
+    var img = document.getElementById('artworkImage');
+    var placeholder = document.getElementById('artworkPlaceholder');
+    img.style.display = 'none';
+    placeholder.style.display = 'block';
+}
+
+// ===== ОСТАЛЬНОЙ JS КОД =====
 var artworkContainer = document.getElementById('artworkContainer');
 var artworkImage = document.getElementById('artworkImage');
 var artworkPlaceholder = document.getElementById('artworkPlaceholder');
@@ -1125,6 +1412,10 @@ var volumeWaves = document.getElementById('volumeWaves');
 var playlistSection = document.getElementById('playlistSection');
 var playlistHeader = document.getElementById('playlistHeader');
 var trackList = document.getElementById('trackList');
+
+// Добавляем обработчики событий для изображения
+artworkImage.onload = onArtworkLoad;
+artworkImage.onerror = onArtworkError;
 
 var masterTrackList = [];
 var shuffledList = [];
@@ -1269,7 +1560,7 @@ function init() {
                         end: parsed.end != null ? parsed.end : parsed.start + 240,
                         title: parsed.title,
                         streamTitle: item.title || 'Без названия',
-                        streamDate: item.date || '',
+                        streamDate: item.published_date || '',
                         streamAuthor: item.author || '',
                         thumbnail: 'https://img.youtube.com/vi/' + item.id + '/hqdefault.jpg',
                         url: 'https://www.youtube.com/watch?v=' + item.id + '&t=' + parsed.start + 's',
@@ -1288,39 +1579,42 @@ function init() {
         .catch(function(e) { console.error(e); });
 }
 
-window.onArtworkLoad = function() {
-    artworkImage.style.display = 'block';
-    artworkPlaceholder.style.display = 'none';
-    if (artworkImage.src && artworkImage.src !== lastArtworkUrl) {
-        lastArtworkUrl = artworkImage.src;
-        try {
-            var color = extractColorFromImage(artworkImage);
-            applyDynamicColor(color.r, color.g, color.b);
-            document.getElementById('playerContainer').style.setProperty('--bg-image', 'url(' + artworkImage.src + ')');
-        } catch(e) {}
-    }
-};
-
-window.onArtworkError = function() {
-    artworkImage.style.display = 'none';
-    artworkPlaceholder.style.display = 'block';
-};
-
 window.onYouTubeIframeAPIReady = function() {
-    player = new YT.Player('ytplayer', {
-        height: '150',
-        width: '200',
-        playerVars: {
-            autoplay: 1,
-            playsinline: 1,
-            mute: 0,
-            rel: 0
-        },
-        events: {
-            onReady: onPlayerReady,
-            onStateChange: onPlayerStateChange
-        }
-    });
+    try {
+        player = new YT.Player('ytplayer', {
+            height: '150',
+            width: '200',
+            playerVars: {
+                autoplay: 1,
+                playsinline: 1,
+                mute: 0,
+                rel: 0,
+                modestbranding: 1,
+                showinfo: 0,
+                controls: 0,
+                origin: window.location.origin
+            },
+            events: {
+                onReady: onPlayerReady,
+                onStateChange: onPlayerStateChange,
+                onError: function(event) {
+                    console.warn('YouTube player error:', event.data);
+                    if (event.data === 100 || event.data === 101 || event.data === 150) {
+                        setTimeout(function() {
+                            if (currentTrack) {
+                                player.loadVideoById({
+                                    videoId: currentTrack.videoId,
+                                    startSeconds: currentTrack.start
+                                });
+                            }
+                        }, 2000);
+                    }
+                }
+            }
+        });
+    } catch(e) {
+        console.warn('YouTube iframe init error:', e);
+    }
 };
 
 function onPlayerReady(event) {
@@ -1419,8 +1713,9 @@ function playTrackAtIndex(index) {
 }
 
 function updateTrackUI() {
+    var formattedDate = formatDateForDisplay(currentTrack.streamDate);
     setupMarquee(trackTitle, currentTrack.title);
-    setupMarquee(streamInfo, currentTrack.streamTitle + ' \u00b7 ' + currentTrack.streamDate);
+    setupMarquee(streamInfo, currentTrack.streamTitle + ' \u00b7 ' + formattedDate);
     trackAuthor.textContent = currentTrack.streamAuthor ? 'Автор треклиста: ' + currentTrack.streamAuthor : '';
     trackIntegrity.textContent = currentTrack.hasEnd ? '\u2705' : '\u26a0\ufe0f';
     trackIntegrity.title = currentTrack.hasEnd ? 'Треклист имеет начало и конец песни' : 'Треклист не имеет времени конца песни';
@@ -1637,20 +1932,28 @@ document.addEventListener('keydown', function(e) {
     else if (e.code === 'ArrowRight' && player && playerReady) { e.preventDefault(); player.seekTo(player.getCurrentTime() + 5, true); }
 });
 
+var scrollBtn = document.getElementById('scrollTopBtn');
+window.addEventListener('scroll', function() { 
+    if (window.scrollY > 300) {
+        if (scrollBtn) scrollBtn.classList.add('show');
+    } else {
+        if (scrollBtn) scrollBtn.classList.remove('show');
+    }
+}, { passive: true });
+
+if (scrollBtn) {
+    scrollBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
 if (typeof YT !== 'undefined' && YT.Player) window.onYouTubeIframeAPIReady();
 window.addEventListener('load', init);
 </script>
 </body>
-</html>'''
+</html>"""
 
-    with open(player_html_path, 'w', encoding='utf-8') as f:
-        f.write(player_html)
-    logging.info("player.html создан: %s", os.path.abspath(player_html_path))
-
-    # ---------- Основной index.html ----------
-    safe_site_url = html.escape(site_url)
-    
-    html_template = fr"""<!DOCTYPE html>
+INDEX_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -1659,14 +1962,14 @@ window.addEventListener('load', init);
     <meta name="description" content="Полный архив музыкальных треклистов с трансляций Квашеной. Удобный поиск песен по таймкодам.">
     <meta name="keywords" content="Квашеная, треклист, трансляции, музыка, песни, архив, таймкоды">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="{safe_site_url}/index.html">
+    <link rel="canonical" href="{site_url}/index.html">
     <meta property="og:title" content="Архив треклистов Квашеной">
     <meta property="og:description" content="Все песни с трансляций – поиск по трекам и таймкодам.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="{safe_site_url}/index.html">
+    <meta property="og:url" content="{site_url}/index.html">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <style>
-        :root {{
+        :root {
             --primary: #6366f1;
             --primary-hover: #4f46e5;
             --bg: #0b0f19;
@@ -1674,40 +1977,40 @@ window.addEventListener('load', init);
             --text-main: #f1f5f9;
             --text-muted: #94a3b8;
             --border: rgba(255, 255, 255, 0.08);
-        }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0 0 60px 0; color: var(--text-main); background: #0b1020; min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }}
-        .scroll-top {{ position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgb(23 29 61 / 28%); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; }}
-        .scroll-top:hover {{ background: rgba(99, 102, 241, 0.9); border-color: rgba(255, 255, 255, 0.5); transform: translateY(-3px); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }}
-        .scroll-top.show {{ opacity: 1; visibility: visible; }}
-        @media (max-width: 768px) {{ .scroll-top {{ bottom: 20px; right: 20px; width: 44px; height: 44px; font-size: 20px; }} }}
-        .skeleton-row {{ background: linear-gradient(180deg, rgba(30, 38, 58, 0.8), rgba(22, 28, 45, 0.9)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: row; gap: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }}
-        .skeleton-img {{ width: 160px; height: 90px; background: #1e293b; border-radius: 12px; }}
-        .skeleton-content {{ flex: 1; display: flex; flex-direction: column; gap: 16px; }}
-        .skeleton-title {{ width: 70%; height: 24px; background: #1e293b; border-radius: 8px; }}
-        .skeleton-details {{ width: 40%; height: 20px; background: #1e293b; border-radius: 8px; }}
-        .shimmer {{ position: relative; overflow: hidden; }}
-        .shimmer::after {{ content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%); animation: shimmerMove 1.2s infinite linear; pointer-events: none; }}
-        @keyframes shimmerMove {{ 0% {{ transform: translateX(-100%); }} 100% {{ transform: translateX(100%); }} }}
-        @media (max-width: 768px) {{ .skeleton-row {{ flex-direction: column; gap: 16px; }} .skeleton-img {{ width: 100%; aspect-ratio: 16/9; height: auto; }} .skeleton-title {{ width: 85%; }} }}
-        .parallax-notes {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }}
-        .note {{ position: absolute; user-select: none; pointer-events: none; will-change: top; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; text-shadow: 0 0 12px rgba(0,0,0,0.4); transition: top 0.1s linear; }}
-        .note-content {{ display: inline-block; animation: gentleFloat 6s infinite ease-in-out; will-change: transform; }}
-        @keyframes gentleFloat {{ 0% {{ transform: translateY(0px); }} 50% {{ transform: translateY(-12px); }} 100% {{ transform: translateY(0px); }} }}
-        body::before {{ content: ""; position: fixed; inset: 0; z-index: -10; pointer-events: none; background-image: radial-gradient(at 80% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 20% 80%, rgba(244, 63, 94, 0.1) 0px, transparent 50%); background-repeat: no-repeat; }}
-        .container {{ max-width: 1000px; margin: 0 auto; padding: 0 24px; }}
-        .header-panel {{ position: sticky; top: 0; background: rgba(11, 15, 25, 0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px 0; margin-bottom: 40px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }}
-        .header-flex {{ display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }}
-        .header-flex h2 {{ display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; white-space: nowrap; }}
-        .header-flex h2 span {{ white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
-        h2 {{ color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }}
-        .search-box {{ flex-grow: 1; max-width: 400px; display: flex; flex-direction: column; align-items: flex-start; }}
-        .input-wrapper {{ position: relative; width: 100%; display: flex; align-items: center; }}
-        .s-input {{ width: 100%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-sizing: border-box; outline: none; transition: all 0.3s; background: rgba(15, 23, 42, 0.6); color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }}
-        .s-input:focus {{ border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(15, 23, 42, 0.8); }}
-        #searchStats {{ color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; margin: 10px 0 4px 4px; pointer-events: none; }}
-        .s-clear-btn {{ position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }}
-        .s-clear-btn:hover {{ background: rgba(255, 255, 255, 0.2); color: #fff; }}
-        .sponsor-toggle {{
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0 0 60px 0; color: var(--text-main); background: #0b1020; min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        .scroll-top { position: fixed; bottom: 30px; right: 30px; width: 48px; height: 48px; background: rgb(23 29 61 / 28%); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; }
+        .scroll-top:hover { background: rgba(99, 102, 241, 0.9); border-color: rgba(255, 255, 255, 0.5); transform: translateY(-3px); box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
+        .scroll-top.show { opacity: 1; visibility: visible; }
+        @media (max-width: 768px) { .scroll-top { bottom: 20px; right: 20px; width: 44px; height: 44px; font-size: 20px; } }
+        .skeleton-row { background: linear-gradient(180deg, rgba(30, 38, 58, 0.8), rgba(22, 28, 45, 0.9)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: row; gap: 24px; margin-bottom: 24px; position: relative; overflow: hidden; }
+        .skeleton-img { width: 160px; height: 90px; background: #1e293b; border-radius: 12px; }
+        .skeleton-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+        .skeleton-title { width: 70%; height: 24px; background: #1e293b; border-radius: 8px; }
+        .skeleton-details { width: 40%; height: 20px; background: #1e293b; border-radius: 8px; }
+        .shimmer { position: relative; overflow: hidden; }
+        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%); animation: shimmerMove 1.2s infinite linear; pointer-events: none; }
+        @keyframes shimmerMove { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @media (max-width: 768px) { .skeleton-row { flex-direction: column; gap: 16px; } .skeleton-img { width: 100%; aspect-ratio: 16/9; height: auto; } .skeleton-title { width: 85%; } }
+        .parallax-notes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
+        .note { position: absolute; user-select: none; pointer-events: none; will-change: top; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; text-shadow: 0 0 12px rgba(0,0,0,0.4); transition: top 0.1s linear; }
+        .note-content { display: inline-block; animation: gentleFloat 6s infinite ease-in-out; will-change: transform; }
+        @keyframes gentleFloat { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
+        body::before { content: ""; position: fixed; inset: 0; z-index: -10; pointer-events: none; background-image: radial-gradient(at 80% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 20% 80%, rgba(244, 63, 94, 0.1) 0px, transparent 50%); background-repeat: no-repeat; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+        .header-panel { position: sticky; top: 0; background: rgba(11, 15, 25, 0.75); border-bottom: 1px solid var(--border); z-index: 100; padding: 20px 0 12px 0; margin-bottom: 40px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+        .header-flex { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+        .header-flex h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; white-space: nowrap; }
+        .header-flex h2 span { white-space: nowrap; background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        h2 { color: #fff; font-size: 24px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 12px; letter-spacing: -0.5px; }
+        .search-box { flex-grow: 1; max-width: 400px; display: flex; flex-direction: column; align-items: flex-start; }
+        .input-wrapper { position: relative; width: 100%; display: flex; align-items: center; }
+        .s-input { width: 100%; padding: 12px 44px 12px 18px; font-size: 15px; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-sizing: border-box; outline: none; transition: all 0.3s; background: rgba(15, 23, 42, 0.6); color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .s-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), inset 0 2px 4px rgba(0,0,0,0.2); background: rgba(15, 23, 42, 0.8); }
+        #searchStats { color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; margin: 10px 0 4px 4px; pointer-events: none; }
+        .s-clear-btn { position: absolute; right: 14px; background: rgba(255, 255, 255, 0.1); border: none; width: 22px; height: 22px; border-radius: 50%; color: #94a3b8; font-size: 11px; font-weight: bold; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; transition: all 0.2s; }
+        .s-clear-btn:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        .sponsor-toggle {
             align-items: center;
             gap: 8px;
             margin-top: 8px;
@@ -1715,11 +2018,11 @@ window.addEventListener('load', init);
             color: var(--text-muted);
             cursor: pointer;
             user-select: none;
-        }}
-        .sponsor-toggle input[type="checkbox"] {{
+        }
+        .sponsor-toggle input[type="checkbox"] {
             display: none !important;
-        }}
-        .sponsor-toggle .toggle-switch {{
+        }
+        .sponsor-toggle .toggle-switch {
             width: 36px;
             height: 20px;
             background: rgba(255,255,255,0.1);
@@ -1727,8 +2030,8 @@ window.addEventListener('load', init);
             position: relative;
             transition: background 0.3s;
             flex-shrink: 0;
-        }}
-        .sponsor-toggle .toggle-switch::after {{
+        }
+        .sponsor-toggle .toggle-switch::after {
             content: '';
             position: absolute;
             top: 2px;
@@ -1738,85 +2041,85 @@ window.addEventListener('load', init);
             background: #94a3b8;
             border-radius: 50%;
             transition: all 0.3s;
-        }}
-        .sponsor-toggle input:checked + .toggle-switch {{
+        }
+        .sponsor-toggle input:checked + .toggle-switch {
             background: var(--primary);
-        }}
-        .sponsor-toggle input:checked + .toggle-switch::after {{
+        }
+        .sponsor-toggle input:checked + .toggle-switch::after {
             left: 18px;
             background: white;
-        }}
-        .row.sponsor {{
+        }
+        .row.sponsor {
             border-color: rgba(245, 158, 11, 0.3) !important;
             background: linear-gradient(180deg, rgba(30, 25, 15, 0.88), rgba(25, 20, 10, 0.94)) !important;
-        }}
-        .row.sponsor::before {{
+        }
+        .row.sponsor::before {
             filter: blur(40px) brightness(0.15) saturate(0.5) sepia(0.5) !important;
             opacity: 0.4 !important;
-        }}
-        .year-filters {{ display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }}
-        .year-btn {{ background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 14px; flex-shrink: 0; }}
-        .year-btn:hover {{ border-color: rgba(255,255,255,0.2); color: #fff; }}
-        .year-btn.active {{ background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }}
-        .grid {{ display: flex; flex-direction: column; gap: 24px; }}
-        .grid:empty {{ min-height: 60vh; }}
-        .row {{ position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; align-items: flex-start; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; overflow: hidden; z-index: 1; }}
-        .row::before {{ content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }}
-        .row * {{ position: relative; z-index: 2; }}
-        .row:hover {{ transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 12px 30px rgba(0,0,0,0.3); }}
-        .row:hover::before {{ opacity: 0.6; }}
-        .v-date {{ position: absolute; top: 24px; right: 24px; color: var(--text-muted); font-size: 13px; font-weight: 700; background: rgba(15, 23, 42, 0.6); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); letter-spacing: 0.5px; z-index: 3; }}
-        .v-content-block {{ display: flex; flex-direction: column; gap: 16px; flex-grow: 1; padding-right: 110px; }}
-        .v-link {{ text-decoration: none; flex-shrink: 0; }}
-        .v-title-link {{ text-decoration: none; align-self: flex-start; }}
-        .v-title-link:hover .v-title {{ color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }}
-        .img-container {{ position: relative; width: 160px; height: 90px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: #151c2d; border: 1px solid rgba(255,255,255,0.05); transform: translateZ(0); }}
-        .img-container::before {{ content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e293b; z-index: 0; }}
-        .img-container img {{ width: 101%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s, opacity 0.2s; position: relative; z-index: 1; }}
-        .img-container:hover img {{ transform: scale(1.05); }}
-        .play-overlay {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.75); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-weight: bold; z-index: 2; }}
-        .img-container:hover .play-overlay {{ opacity: 1; }}
-        .v-title {{ font-size: 18px; color: #f8fafc; font-weight: 700; line-height: 1.4; transition: color 0.2s; overflow-wrap: break-word; }}
-        .v-tcs {{ width: 100%; max-width: 600px; }}
-        details {{ background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); transition: all 0.2s; }}
-        details[open] {{ background: rgba(15, 23, 42, 0.7); border-color: rgba(99, 102, 241, 0.4); }}
-        summary {{ font-weight: 600; cursor: pointer; color: #cbd5e1; outline: none; user-select: none; font-size: 14px; list-style: none; }}
-        summary::-webkit-details-marker {{ display: none; }}
-        .summary-flex {{ display: flex; align-items: center; justify-content: space-between; gap: 15px; }}
-        .summary-flex span:first-child::before {{ content: "▼ "; font-size: 9px; color: var(--text-muted); display: inline-block; transition: transform 0.2s; margin-right: 8px; transform: rotate(-90deg); }}
-        details[open] summary .summary-flex span:first-child::before {{ transform: rotate(0deg); }}
-        .tc-list {{ margin-top: 16px; line-height: 1.7; max-height: 280px; overflow-y: auto; padding-right: 8px; position: relative; transition: opacity 0.3s ease, transform 0.3s ease; }}
-        .tc-list::-webkit-scrollbar {{ width: 4px; }}
-        .tc-list::-webkit-scrollbar-track {{ background: transparent; }}
-        .tc-list::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.15); border-radius: 10px; }}
-        .tc-list::-webkit-scrollbar-thumb:hover {{ background: rgba(255,255,255,0.3); }}
-        .no-tc-block {{ background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); cursor: default; display: none; }}
-        .no-tc-block span {{ font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; }}
-        .t-click {{ background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 3px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-right: 12px; display: inline-block; font-size: 13px; transition: all 0.2s; font-variant-numeric: tabular-nums; border: 1px solid rgba(99, 102, 241, 0.2); }}
-        .t-click:hover {{ background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 10px rgba(99,102,241,0.4); }}
-        .tc-item {{ margin-bottom: 10px; border-bottom: 1px dashed rgba(255, 255, 255, 0.15); padding-bottom: 8px; font-size: 14px; display: flex; align-items: center; }}
-        .tc-item:last-of-type {{ border-bottom: none; margin-bottom: 0; padding-bottom: 0; }}
-        .s-title {{ color: #e2e8f0; }}
-        .badge {{ display: inline-block; padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; }}
-        .badge-tracklist {{ background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }}
-        .badge-mixed {{ background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }}
-        mark {{ background: rgba(139, 92, 246, 0.35); color: #ffffff; padding: 1px 1px; border-radius: 6px; border: 1px solid rgba(196, 181, 253, 0.6); text-shadow: 0 0 6px rgba(139, 92, 246, 0.8); }}
-        .hide {{ display: none; }}
-        .gray {{ color: var(--text-muted); font-size: 14px; font-style: italic; }}
-        .no-tcs-box {{ padding: 4px 0; }}
-        .tc-author {{ font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }}
-        .player-link {{
+        }
+        .year-filters { display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+        .year-btn { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); padding: 10px 20px; border-radius: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-size: 14px; flex-shrink: 0; }
+        .year-btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
+        .year-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+        .grid { display: flex; flex-direction: column; gap: 24px; }
+        .grid:empty { min-height: 60vh; }
+        .row { position: relative; display: flex; flex-direction: row; gap: 24px; padding: 24px; align-items: flex-start; background: linear-gradient(180deg, rgba(20,28,48,0.88), rgba(15,22,40,0.94)); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s; overflow: hidden; z-index: 1; }
+        .row::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: var(--bg-thumb); background-size: 120%; background-position: center; filter: blur(40px) brightness(0.25) saturate(1.4); opacity: 0.55; transition: opacity 0.3s; z-index: -1; pointer-events: none; }
+        .row * { position: relative; z-index: 2; }
+        .row:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 12px 30px rgba(0,0,0,0.3); }
+        .row:hover::before { opacity: 0.6; }
+        .v-date { position: absolute; top: 24px; right: 24px; color: var(--text-muted); font-size: 13px; font-weight: 700; background: rgba(15, 23, 42, 0.6); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); letter-spacing: 0.5px; z-index: 3; }
+        .v-content-block { display: flex; flex-direction: column; gap: 16px; flex-grow: 1; padding-right: 110px; }
+        .v-link { text-decoration: none; flex-shrink: 0; }
+        .v-title-link { text-decoration: none; align-self: flex-start; }
+        .v-title-link:hover .v-title { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .img-container { position: relative; width: 160px; height: 90px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: #151c2d; border: 1px solid rgba(255,255,255,0.05); transform: translateZ(0); }
+        .img-container::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1e293b; z-index: 0; }
+        .img-container img { width: 101%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s, opacity 0.2s; position: relative; z-index: 1; }
+        .img-container:hover img { transform: scale(1.05); }
+        .play-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.75); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; font-weight: bold; z-index: 2; }
+        .img-container:hover .play-overlay { opacity: 1; }
+        .v-title { font-size: 18px; color: #f8fafc; font-weight: 700; line-height: 1.4; transition: color 0.2s; overflow-wrap: break-word; }
+        .v-tcs { width: 100%; max-width: 600px; }
+        details { background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); transition: all 0.2s; }
+        details[open] { background: rgba(15, 23, 42, 0.7); border-color: rgba(99, 102, 241, 0.4); }
+        summary { font-weight: 600; cursor: pointer; color: #cbd5e1; outline: none; user-select: none; font-size: 14px; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        .summary-flex { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+        .summary-flex span:first-child::before { content: "▼ "; font-size: 9px; color: var(--text-muted); display: inline-block; transition: transform 0.2s; margin-right: 8px; transform: rotate(-90deg); }
+        details[open] summary .summary-flex span:first-child::before { transform: rotate(0deg); }
+        .tc-list { margin-top: 16px; line-height: 1.7; max-height: 280px; overflow-y: auto; padding-right: 8px; position: relative; transition: opacity 0.3s ease, transform 0.3s ease; }
+        .tc-list::-webkit-scrollbar { width: 4px; }
+        .tc-list::-webkit-scrollbar-track { background: transparent; }
+        .tc-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+        .tc-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+        .no-tc-block { background: rgba(15, 23, 42, 0.4); padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.4); cursor: default; display: none; }
+        .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; }
+        .t-click { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; padding: 3px 10px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-right: 12px; display: inline-block; font-size: 13px; transition: all 0.2s; font-variant-numeric: tabular-nums; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .t-click:hover { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 0 10px rgba(99,102,241,0.4); }
+        .tc-item { margin-bottom: 10px; border-bottom: 1px dashed rgba(255, 255, 255, 0.15); padding-bottom: 8px; font-size: 14px; display: flex; align-items: center; }
+        .tc-item:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .s-title { color: #e2e8f0; }
+        .badge { display: inline-block; padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; }
+        .badge-tracklist { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-mixed { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        mark { background: rgba(139, 92, 246, 0.35); color: #ffffff; padding: 1px 1px; border-radius: 6px; border: 1px solid rgba(196, 181, 253, 0.6); text-shadow: 0 0 6px rgba(139, 92, 246, 0.8); }
+        .hide { display: none; }
+        .gray { color: var(--text-muted); font-size: 14px; font-style: italic; }
+        .no-tcs-box { padding: 4px 0; }
+        .tc-author { font-size: 11px; color: var(--text-muted); margin-top: 10px; text-align: right; font-style: italic; opacity: 0.65; letter-spacing: 0.3px; }
+        .player-link {
             margin-left: 20px;
             font-size: 16px;
             color: var(--primary);
             text-decoration: none;
             font-weight: 600;
             transition: color 0.2s;
-        }}
-        .player-link:hover {{
+        }
+        .player-link:hover {
             color: #a5b4fc;
-        }}
-        @media (max-width: 768px) {{ .header-flex {{ flex-direction: column; align-items: flex-start; gap: 14px; }} .search-box {{ width: 100%; max-width: 100%; }} .row {{ flex-direction: column; gap: 16px; padding: 20px; }} .row::before {{ z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; }} .v-date {{ position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; }} .v-content-block {{ padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; }} .v-link {{ display: block; width: 100%; z-index: 2; }} .img-container {{ width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; }} .img-container img {{ z-index: 1 !important; }} .play-overlay {{ display: none !important; }} .v-title {{ font-size: 16px; }} .v-tcs {{ max-width: 100%; width: 100%; }} details {{ margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; }} details[open] {{ border-bottom: none; background: rgba(15,23,42,0.8); }} .no-tc-block {{ margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; }} .no-tc-block span {{ font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; }} .tc-list {{ padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; }} .t-click {{ margin-right: 6px; }} .header-panel {{ position: relative; }} summary {{ -webkit-tap-highlight-color: transparent; }} }}
+        }
+        @media (max-width: 768px) { .header-flex { flex-direction: column; align-items: flex-start; gap: 14px; } .search-box { width: 100%; max-width: 100%; } .row { flex-direction: column; gap: 16px; padding: 20px; } .row::before { z-index: -1 !important; filter: blur(45px) saturate(0.9) !important; opacity: 0.5 !important; } .v-date { position: static; margin-bottom: 0; font-size: 12px; align-self: flex-start; padding: 4px 8px; z-index: 2; } .v-content-block { padding-right: 0; margin-top: 0; gap: 12px; z-index: 2; width: 100%; } .v-link { display: block; width: 100%; z-index: 2; } .img-container { width: 100%; height: auto; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; } .img-container img { z-index: 1 !important; } .play-overlay { display: none !important; } .v-title { font-size: 16px; } .v-tcs { max-width: 100%; width: 100%; } details { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; transition: none !important; } details[open] { border-bottom: none; background: rgba(15,23,42,0.8); } .no-tc-block { margin: 0 -20px; border-left: none; border-right: none; border-radius: 0; padding: 12px 20px; display: none; } .no-tc-block span { font-weight: 600; color: #cbd5e1; font-size: 14px; font-style: normal; } .tc-list { padding-left: 8px; padding-right: 8px; max-height: 220px; overflow-y: auto; scroll-behavior: auto; -webkit-overflow-scrolling: touch; } .t-click { margin-right: 6px; } .header-panel { position: relative; } summary { -webkit-tap-highlight-color: transparent; } }
     </style>
 </head>
 <body>
@@ -1850,13 +2153,13 @@ window.addEventListener('load', init);
 </div>
 <button class="scroll-top" id="scrollTopBtn" aria-label="Наверх">↑</button>
 <script>
-(function() {{
+(function() {
     const notesContainer = document.getElementById('parallaxNotes');
     if (!notesContainer) return;
     const noteSymbols = ['♪', '♫', '♩', '🎵', '🎶', '𝄞', '♬', '🎙️', '🎸', '🎹'];
     const notesCount = 10;
     const notes = [];
-    for (let i = 0; i < notesCount; i++) {{
+    for (let i = 0; i < notesCount; i++) {
         const noteDiv = document.createElement('div');
         noteDiv.className = 'note';
         const symbol = noteSymbols[Math.floor(Math.random() * noteSymbols.length)];
@@ -1871,60 +2174,88 @@ window.addEventListener('load', init);
         contentSpan.textContent = symbol;
         contentSpan.style.fontSize = size + 'px';
         contentSpan.style.opacity = opacity;
-        contentSpan.style.color = `rgba(255, 255, 255, ${{opacity * 0.9}})`;
+        contentSpan.style.color = `rgba(255, 255, 255, ${opacity * 0.9})`;
         const animDuration = 4 + Math.random() * 6;
-        contentSpan.style.animation = `gentleFloat ${{animDuration}}s infinite ease-in-out`;
-        contentSpan.style.animationDelay = `${{Math.random() * 3}}s`;
+        contentSpan.style.animation = `gentleFloat ${animDuration}s infinite ease-in-out`;
+        contentSpan.style.animationDelay = `${Math.random() * 3}s`;
         noteDiv.appendChild(contentSpan);
         noteDiv.style.left = left + '%';
         noteDiv.style.top = top + '%';
-        noteDiv.style.transform = `rotate(${{rotation}}deg)`;
+        noteDiv.style.transform = `rotate(${rotation}deg)`;
         notesContainer.appendChild(noteDiv);
-        notes.push({{ element: noteDiv, baseTop: parseFloat(top), parallaxFactor }});
-    }}
+        notes.push({ element: noteDiv, baseTop: parseFloat(top), parallaxFactor });
+    }
     let ticking = false;
-    function updateNotesPosition() {{
+    function updateNotesPosition() {
         const scrollY = window.scrollY;
         const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
         const scrollProgress = maxScroll > 0 ? scrollY / maxScroll : 0;
-        for (let n of notes) {{
+        for (let n of notes) {
             const shiftPercent = (scrollProgress - 0.5) * n.parallaxFactor * 16;
             let newTop = n.baseTop + shiftPercent;
             newTop = Math.min(Math.max(newTop, -5), 105);
             n.element.style.top = newTop + '%';
-        }}
+        }
         ticking = false;
-    }}
-    window.addEventListener('scroll', () => {{ if (!ticking) {{ requestAnimationFrame(updateNotesPosition); ticking = true; }} }});
-    window.addEventListener('resize', () => updateNotesPosition());
+    }
+    window.addEventListener('scroll', function() {
+        if (!ticking) {
+            requestAnimationFrame(updateNotesPosition);
+            ticking = true;
+        }
+    }, { passive: true });
+    window.addEventListener('resize', function() {
+        updateNotesPosition();
+    });
     updateNotesPosition();
-}})();
+})();
 
-function removeSpecificEmojis(str) {{
-    if (typeof Intl !== 'undefined' && Intl.Segmenter) {{
-        const segmenter = new Intl.Segmenter('en', {{ granularity: 'grapheme' }});
-        const segments = [...segmenter.segment(str)];
-        let result = '';
-        for (const seg of segments) {{
-            const grapheme = seg.segment;
-            const isEmoji = /\p{{Emoji}}/u.test(grapheme) && !/[\p{{N}}\p{{L}}]/u.test(grapheme);
-            if (!isEmoji) {{
-                result += grapheme;
-            }}
-        }}
-        return result;
-    }} else {{
-        return str.replace(/[\u{{1F600}}-\u{{1F64F}}\u{{1F300}}-\u{{1F5FF}}\u{{1F680}}-\u{{1F6FF}}\u{{1F1E0}}-\u{{1F1FF}}\u{{2600}}-\u{{26FF}}\u{{2700}}-\u{{27BF}}\u{{1F900}}-\u{{1F9FF}}\u{{1FA00}}-\u{{1FA6F}}\u{{1FA70}}-\u{{1FAFF}}]/gu, '');
-    }}
-}}
+function escapeHtml(str) {
+    try {
+        if (str == null) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(String(str)));
+        return div.innerHTML;
+    } catch(e) {
+        return String(str || '');
+    }
+}
 
-function normalize(str) {{
-    return str.toLowerCase()
-              .replace(/ë/g, 'e')
-              .replace(/[^a-zа-яё0-9]/g, '');
-}}
+function normalize(str) {
+    try {
+        if (str == null) return '';
+        return String(str).toLowerCase()
+                  .replace(/ë/g, 'e')
+                  .replace(/[^a-zа-яё0-9]/g, '');
+    } catch(e) {
+        return '';
+    }
+}
 
-const SYNONYMS = {{
+function removeSpecificEmojis(str) {
+    try {
+        if (str == null) return '';
+        if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+            const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+            const segments = [...segmenter.segment(str)];
+            let result = '';
+            for (const seg of segments) {
+                const grapheme = seg.segment;
+                const isEmoji = /\p{Emoji}/u.test(grapheme) && !/[\p{N}\p{L}]/u.test(grapheme);
+                if (!isEmoji) {
+                    result += grapheme;
+                }
+            }
+            return result;
+        } else {
+            return String(str).replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu, '');
+        }
+    } catch(e) {
+        return String(str || '');
+    }
+}
+
+const SYNONYMS = {
     "noizemc": ["noizemc", "noizemc", "нойзмс", "нойзмс", "noize", "нойз"],
     "rammstein": ["rammstein", "раммштайн"],
     "корольишут": ["корольишут", "киш"],
@@ -1935,510 +2266,465 @@ const SYNONYMS = {{
     "nautiluspompilius": ["nautiluspompilius", "наутилуспомпилиус", "pompilius", "nautilus", "наутилус", "помпилиус"],
     "океанэлзи": ["океанэлзи", "элзи", "океанэльзы", "эльзы", "океанельзи", "ельзи"],
     "iowa": ["iowa", "айова"]
-}};
+};
 
 const variantToCanon = new Map();
-for (const [canon, variants] of Object.entries(SYNONYMS)) {{
-    for (const v of variants) {{
+for (const [canon, variants] of Object.entries(SYNONYMS)) {
+    for (const v of variants) {
         variantToCanon.set(v, canon);
-    }}
-}}
+    }
+}
 
-function getSearchVariants(query) {{
-    const normQuery = normalize(query);
-    if (variantToCanon.has(normQuery)) {{
-        const canon = variantToCanon.get(normQuery);
-        return SYNONYMS[canon];
-    }}
-    return [normQuery];
-}}
+function getSearchVariants(query) {
+    try {
+        if (!query) return [];
+        const normQuery = normalize(query);
+        if (variantToCanon.has(normQuery)) {
+            const canon = variantToCanon.get(normQuery);
+            return SYNONYMS[canon] || [normQuery];
+        }
+        return [normQuery];
+    } catch(e) {
+        return [normalize(query)];
+    }
+}
 
-function matchesWithVariants(textNorm, variants) {{
-    for (let v of variants) {{
-        const normVariant = normalize(v);
-        if (textNorm.includes(normVariant)) return true;
-    }}
-    return false;
-}}
+function matchesWithVariants(textNorm, variants) {
+    try {
+        if (!textNorm || !variants || variants.length === 0) return false;
+        for (let v of variants) {
+            const normVariant = normalize(v);
+            if (textNorm.includes(normVariant)) return true;
+        }
+        return false;
+    } catch(e) {
+        return false;
+    }
+}
 
-function escapeHtml(str) {{
-    const div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
-    return div.innerHTML;
-}}
-
-function highlightFirstMatch(escapedText, variants) {{
-    if (!variants || variants.length === 0) return escapedText;
-    const normEscaped = normalize(escapedText);
-    let bestMatch = null;
-    let bestIndex = Infinity;
-    for (let v of variants) {{
-        const normV = normalize(v);
-        const idx = normEscaped.indexOf(normV);
-        if (idx !== -1 && idx < bestIndex) {{
-            bestIndex = idx;
-            bestMatch = normV;
-        }}
-    }}
-    if (bestMatch === null) return escapedText;
-    let origIdx = 0, normIdx = 0;
-    while (normIdx < bestIndex && origIdx < escapedText.length) {{
-        const ch = escapedText[origIdx];
-        const nch = normalize(ch);
-        if (nch.length > 0) normIdx++;
-        origIdx++;
-    }}
-    const start = origIdx;
-    while (normIdx < bestIndex + bestMatch.length && origIdx < escapedText.length) {{
-        const ch = escapedText[origIdx];
-        const nch = normalize(ch);
-        if (nch.length > 0) normIdx++;
-        origIdx++;
-    }}
-    const end = origIdx;
-    return escapedText.substring(0, start) + '<mark>' + escapedText.substring(start, end) + '</mark>' + escapedText.substring(end);
-}}
+function highlightFirstMatch(escapedText, variants) {
+    try {
+        if (!variants || variants.length === 0 || !escapedText) return escapedText || '';
+        const normEscaped = normalize(escapedText);
+        let bestMatch = null;
+        let bestIndex = Infinity;
+        for (let v of variants) {
+            const normV = normalize(v);
+            const idx = normEscaped.indexOf(normV);
+            if (idx !== -1 && idx < bestIndex) {
+                bestIndex = idx;
+                bestMatch = normV;
+            }
+        }
+        if (bestMatch === null) return escapedText;
+        let origIdx = 0, normIdx = 0;
+        while (normIdx < bestIndex && origIdx < escapedText.length) {
+            const ch = escapedText[origIdx];
+            const nch = normalize(ch);
+            if (nch.length > 0) normIdx++;
+            origIdx++;
+        }
+        const start = origIdx;
+        while (normIdx < bestIndex + bestMatch.length && origIdx < escapedText.length) {
+            const ch = escapedText[origIdx];
+            const nch = normalize(ch);
+            if (nch.length > 0) normIdx++;
+            origIdx++;
+        }
+        const end = origIdx;
+        return escapedText.substring(0, start) + '<mark>' + escapedText.substring(start, end) + '</mark>' + escapedText.substring(end);
+    } catch(e) {
+        return escapedText || '';
+    }
+}
 
 let streamsData = [];
-let songsDB = {{}};
+let songsDB = {};
 let searchIndex = [];
 let activeYear = 'all';
 let allRows = [];
 
-function getTimecodeSeconds(line) {{
-    const match = line.match(/(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)/);
-    if (!match) return 99999999;
-    const parts = match[1].split(':').map(Number);
-    if (parts.length === 2) return parts[0]*60 + parts[1];
-    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
-    return 99999999;
-}}
+function getTimecodeSeconds(line) {
+    try {
+        if (!line) return 99999999;
+        const match = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+        if (!match) return 99999999;
+        const parts = match[1].split(':').map(Number);
+        if (parts.length === 2) return parts[0]*60 + parts[1];
+        if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+        return 99999999;
+    } catch(e) {
+        return 99999999;
+    }
+}
 
-function normalizeTimecode(tc) {{
-    const parts = tc.split(':').map(Number);
-    if (parts.length === 2) return `00:${{parts[0].toString().padStart(2,'0')}}:${{parts[1].toString().padStart(2,'0')}}`;
-    if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
-    return tc;
-}}
+function normalizeTimecode(tc) {
+    try {
+        if (!tc) return '00:00:00';
+        const parts = tc.split(':').map(Number);
+        if (parts.length === 2) return `00:${parts[0].toString().padStart(2,'0')}:${parts[1].toString().padStart(2,'0')}`;
+        if (parts.length === 3) return parts.map(p => p.toString().padStart(2,'0')).join(':');
+        return tc;
+    } catch(e) {
+        return '00:00:00';
+    }
+}
 
-async function loadDatabase() {{
+async function loadDatabase() {
     if (streamsData.length > 0) return;
-    try {{
+    try {
         const response = await fetch('parsed_streams_db.json');
         if (!response.ok) throw new Error('Файл базы не найден');
         let rawData = await response.json();
-        rawData.sort((a,b) => (b.raw_date || '00000000').localeCompare(a.raw_date || '00000000'));
+        rawData.sort((a, b) => {
+            const dateA = a.published_date || '1970-01-01';
+            const dateB = b.published_date || '1970-01-01';
+            return dateB.localeCompare(dateA);
+        });
         streamsData = rawData.filter(entry => entry.list_type === 'tracklist' || entry.list_type === 'mixed');
-        songsDB = {{}};
+        songsDB = {};
         searchIndex = [];
-        streamsData.forEach(entry => {{
+        streamsData.forEach(entry => {
             const vId = entry.id;
             const timecodes = entry.timecodes || [];
             const sorted = timecodes.slice().sort((a,b) => getTimecodeSeconds(a) - getTimecodeSeconds(b));
-            const tracks = sorted.map(line => {{
-                const cleanedLine = line.replace(
-                    /(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)\s*[-–—]\s*\d{{1,2}}:\d{{2}}(?::\d{{2}})?/,
-                    '$1'
-                );
-                const match = cleanedLine.match(/(\d{{1,2}}:\d{{2}}(?::\d{{2}})?)/);
-                if (match) {{
-                    let s = cleanedLine.replace(match[1], '').trim();
-                    s = s.replace(/^[-–—]\s*/, '');
-                    s = removeSpecificEmojis(s);
-                    return {{ t: match[1], s: s }};
-                }} else {{
-                    let s = removeSpecificEmojis(cleanedLine);
-                    return {{ s: s }};
-                }}
-            }});
-            songsDB[vId] = {{ tracks, author: entry.author || '' }};
-            tracks.forEach(tr => {{
-                const norm = normalize(tr.s || '');
-                searchIndex.push({{ id: vId, text: tr.s, norm: norm }});
-            }});
-        }});
-    }} catch(e) {{ console.error('Ошибка загрузки базы:', e); streamsData = []; }}
-}}
+            const tracks = sorted.map(line => {
+                try {
+                    const cleanedLine = String(line || '').replace(
+                        /(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*\d{1,2}:\d{2}(?::\d{2})?/,
+                        '$1'
+                    );
+                    const match = cleanedLine.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+                    if (match) {
+                        let s = cleanedLine.replace(match[1], '').trim();
+                        s = s.replace(/^[-–—]\s*/, '');
+                        s = removeSpecificEmojis(s);
+                        return { t: match[1], s: s };
+                    } else {
+                        let s = removeSpecificEmojis(cleanedLine);
+                        return { s: s };
+                    }
+                } catch(e) {
+                    return { s: '' };
+                }
+            });
+            songsDB[vId] = { tracks, author: entry.author || '' };
+            tracks.forEach(tr => {
+                try {
+                    const norm = normalize(tr.s || '');
+                    searchIndex.push({ id: vId, text: tr.s, norm: norm });
+                } catch(e) {}
+            });
+        });
+    } catch(e) {
+        console.error('Ошибка загрузки базы:', e);
+        streamsData = [];
+        const grid = document.getElementById('mainGrid');
+        if (grid) {
+            grid.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">⚠️ Не удалось загрузить базу треклистов. Проверьте подключение к интернету.</div>';
+        }
+    }
+}
 
-function renderStreamHTML(stream) {{
-    const vId = stream.id;
-    const title = escapeHtml(stream.title || 'Без названия');
-    const date = escapeHtml(stream.date || 'Неизвестно');
-    const rawYear = (stream.raw_date || '0000').substring(0,4);
-    const timecodes = stream.timecodes || [];
-    const listType = stream.list_type || 'none';
-    const isSponsor = stream.is_sponsor || false;
-    const hasTracks = timecodes.length > 0;
-    const sponsorClass = isSponsor ? ' sponsor' : '';
-    const badgeClass = `badge-${{listType}}`;
-    const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
-    const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${{timecodes.length}}</span><span class="badge ${{badgeClass}}">${{badgeText}}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
-    return `<div class="row${{sponsorClass}}" data-id="${{vId}}" data-year="${{rawYear}}" style="--bg-thumb: url('https://img.youtube.com/vi/${{vId}}/hqdefault.jpg');"><span class="v-date">${{date}}</span><a class="v-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${{vId}}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${{vId}}" target="_blank"><span class="v-title">${{title}}</span></a><div class="v-tcs">${{tcsHTML}}</div></div></div>`;
-}}
+function renderStreamHTML(stream) {
+    try {
+        const vId = stream.id;
+        const title = escapeHtml(stream.title || 'Без названия');
+        
+        let date = 'Неизвестно';
+        let rawYear = '0000';
+        
+        if (stream.published_date) {
+            try {
+                let dateStr = stream.published_date;
+                if (typeof dateStr !== 'string') {
+                    dateStr = String(dateStr);
+                }
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    date = `${parts[2]}.${parts[1]}.${parts[0]}`;
+                    rawYear = parts[0];
+                }
+            } catch(e) {
+                date = 'Неизвестно';
+                rawYear = '0000';
+            }
+        }
+        date = escapeHtml(date);
+        
+        const timecodes = stream.timecodes || [];
+        const listType = stream.list_type || 'none';
+        const isSponsor = stream.is_sponsor || false;
+        const hasTracks = timecodes.length > 0;
+        const sponsorClass = isSponsor ? ' sponsor' : '';
+        const badgeClass = `badge-${listType}`;
+        const badgeText = listType === 'tracklist' ? 'Готовый трек-лист' : (listType === 'mixed' ? 'Сборный список' : '');
+        const tcsHTML = hasTracks ? `<details><summary><div class="summary-flex"><span>Треклист ${timecodes.length}</span><span class="badge ${badgeClass}">${badgeText}</span></div></summary><div class="tc-list"></div></details>` : '<div class="no-tc-block"><span>Треклист не найден</span></div>';
+        return `<div class="row${sponsorClass}" data-id="${vId}" data-year="${rawYear}" style="--bg-thumb: url('https://img.youtube.com/vi/${vId}/hqdefault.jpg');"><span class="v-date">${date}</span><a class="v-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><div class="img-container"><img loading="lazy" decoding="async" src="https://img.youtube.com/vi/${vId}/hqdefault.jpg" alt="" onerror="this.style.opacity='0';"><span class="play-overlay">▶ Смотреть</span></div></a><div class="v-content-block"><a class="v-title-link" href="https://www.youtube.com/watch?v=${vId}" target="_blank"><span class="v-title">${title}</span></a><div class="v-tcs">${tcsHTML}</div></div></div>`;
+    } catch(e) {
+        return '<div class="row" style="padding:20px;color:#94a3b8;">Ошибка рендеринга</div>';
+    }
+}
 
-function animateContainer(container) {{
-    container.style.transition = 'none';
-    container.style.opacity = '0';
-    container.style.transform = 'translateY(-10px)';
-    void container.offsetHeight;
-    container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-    container.style.opacity = '1';
-    container.style.transform = 'translateY(0)';
-}}
+function animateContainer(container) {
+    if (!container) return;
+    try {
+        container.style.transition = 'none';
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-10px)';
+        void container.offsetHeight;
+        container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+    } catch(e) {}
+}
 
-function renderAllStreams() {{
-    const grid = document.getElementById('mainGrid');
-    grid.innerHTML = streamsData.map(renderStreamHTML).join('');
-    allRows = [...grid.querySelectorAll('.row')];
-    document.querySelectorAll('details').forEach(details => {{
-        details.addEventListener('toggle', function() {{
-            const container = this.querySelector('.tc-list');
-            if (!container) return;
-            if (this.open) {{
-                const row = this.closest('.row');
-                const vId = row.getAttribute('data-id');
-                const filter = searchInput.value.toLowerCase().trim();
-                if (container.children.length === 0) renderTracklist(vId, container, filter);
-                animateContainer(container);
-                if (filter) {{
-                    setTimeout(() => {{
-                        const mark = container.querySelector('mark');
-                        if (mark) {{
-                            const item = mark.closest('.tc-item');
-                            if (item) container.scrollTop = item.offsetTop - container.offsetTop - 10;
-                        }}
-                    }}, 50);
-                }}
-            }} else {{
-                container.style.transition = 'none';
-                container.style.opacity = '0';
-                container.style.transform = 'translateY(-10px)';
-            }}
-        }});
-    }});
-}}
+function renderAllStreams() {
+    try {
+        const grid = document.getElementById('mainGrid');
+        grid.innerHTML = streamsData.map(renderStreamHTML).join('');
+        allRows = [...grid.querySelectorAll('.row')];
+        document.querySelectorAll('details').forEach(details => {
+            details.addEventListener('toggle', function() {
+                try {
+                    const container = this.querySelector('.tc-list');
+                    if (!container) return;
+                    if (this.open) {
+                        const row = this.closest('.row');
+                        const vId = row ? row.getAttribute('data-id') : null;
+                        const filter = searchInput.value.toLowerCase().trim();
+                        if (container.children.length === 0 && vId) renderTracklist(vId, container, filter);
+                        animateContainer(container);
+                        if (filter) {
+                            setTimeout(() => {
+                                const mark = container.querySelector('mark');
+                                if (mark) {
+                                    const item = mark.closest('.tc-item');
+                                    if (item) container.scrollTop = item.offsetTop - container.offsetTop - 10;
+                                }
+                            }, 50);
+                        }
+                    } else {
+                        container.style.transition = 'none';
+                        container.style.opacity = '0';
+                        container.style.transform = 'translateY(-10px)';
+                    }
+                } catch(e) {}
+            });
+        });
+    } catch(e) {
+        console.error('Ошибка рендеринга:', e);
+    }
+}
 
-function initYearFilters() {{
-    const yearsSet = new Set();
-    allRows.forEach(row => {{ const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); }});
-    const sortedYears = Array.from(yearsSet).sort().reverse();
-    const container = document.getElementById('yearFilters');
-    const currentYear = new Date().getFullYear().toString();
-    
-    let html = '<button class="year-btn" data-year="all">Все годы</button>';
-    sortedYears.forEach(y => {{
-        const isActive = y === currentYear ? ' active' : '';
-        html += `<button class="year-btn${{isActive}}" data-year="${{y}}">${{y}} года</button>`;
-    }});
-    container.innerHTML = html;
-    
-    // Если есть кнопка текущего года - активируем её
-    if (sortedYears.includes(currentYear)) {{
-        activeYear = currentYear;
-    }} else {{
-        activeYear = 'all';
-        const allBtn = container.querySelector('[data-year="all"]');
-        if (allBtn) allBtn.classList.add('active');
-    }}
-    
-    container.addEventListener('click', (e) => {{
-        if(e.target.classList.contains('year-btn')) {{
-            document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            activeYear = e.target.getAttribute('data-year');
-            executeSearch(searchInput.value.toLowerCase().trim());
-        }}
-    }});
-}}
+function initYearFilters() {
+    try {
+        const yearsSet = new Set();
+        allRows.forEach(row => { const y = row.getAttribute('data-year'); if(y && y !== '0000') yearsSet.add(y); });
+        const sortedYears = Array.from(yearsSet).sort().reverse();
+        const container = document.getElementById('yearFilters');
+        const currentYear = new Date().getFullYear().toString();
+        
+        let html = '<button class="year-btn" data-year="all">Все годы</button>';
+        sortedYears.forEach(y => {
+            const isActive = y === currentYear ? ' active' : '';
+            html += `<button class="year-btn${isActive}" data-year="${y}">${y} года</button>`;
+        });
+        container.innerHTML = html;
+        
+        if (sortedYears.includes(currentYear)) {
+            activeYear = currentYear;
+        } else {
+            activeYear = 'all';
+            const allBtn = container.querySelector('[data-year="all"]');
+            if (allBtn) allBtn.classList.add('active');
+        }
+        
+        container.addEventListener('click', (e) => {
+            if(e.target.classList.contains('year-btn')) {
+                document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeYear = e.target.getAttribute('data-year');
+                executeSearch(searchInput.value.toLowerCase().trim());
+            }
+        });
+    } catch(e) {
+        console.error('Ошибка инициализации фильтров:', e);
+    }
+}
 
-function renderTracklist(vId, container, filter) {{
-    const tracks = songsDB[vId]?.tracks || [];
-    let html = '';
-    if (filter) {{
-        const variants = getSearchVariants(filter);
-        tracks.forEach(tr => {{
-            let sText = tr.s;
-            sText = escapeHtml(sText);
-            const normText = normalize(sText);
-            if (matchesWithVariants(normText, variants)) {{
-                sText = highlightFirstMatch(sText, variants);
-            }}
-            const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${{tr.t}}">${{displayedTime}}</span><span class="s-title">${{sText}}</span></div>` : `<div class="tc-item"><span class="s-title">${{sText}}</span></div>`;
-        }});
-    }} else {{
-        tracks.forEach(tr => {{
-            const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
-            const safeText = escapeHtml(tr.s);
-            html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${{tr.t}}">${{displayedTime}}</span><span class="s-title">${{safeText}}</span></div>` : `<div class="tc-item"><span class="s-title">${{safeText}}</span></div>`;
-        }});
-    }}
-    const author = songsDB[vId]?.author;
-    if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${{escapeHtml(author)}}</div>`;
-    container.innerHTML = html;
-}}
+function renderTracklist(vId, container, filter) {
+    try {
+        const tracks = songsDB[vId]?.tracks || [];
+        let html = '';
+        if (filter) {
+            const variants = getSearchVariants(filter);
+            tracks.forEach(tr => {
+                try {
+                    let sText = tr.s || '';
+                    sText = escapeHtml(sText);
+                    const normText = normalize(sText);
+                    if (matchesWithVariants(normText, variants)) {
+                        sText = highlightFirstMatch(sText, variants);
+                    }
+                    const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
+                    html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${sText}</span></div>` : `<div class="tc-item"><span class="s-title">${sText}</span></div>`;
+                } catch(e) {}
+            });
+        } else {
+            tracks.forEach(tr => {
+                try {
+                    const displayedTime = tr.t ? normalizeTimecode(tr.t) : '';
+                    const safeText = escapeHtml(tr.s || '');
+                    html += tr.t ? `<div class="tc-item"><span class="t-click" data-time="${tr.t}">${displayedTime}</span><span class="s-title">${safeText}</span></div>` : `<div class="tc-item"><span class="s-title">${safeText}</span></div>`;
+                } catch(e) {}
+            });
+        }
+        const author = songsDB[vId]?.author;
+        if (author && author.trim() !== '') html += `<div class="tc-author">Автор треклиста: ${escapeHtml(author)}</div>`;
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div class="tc-item">Ошибка загрузки треков</div>';
+    }
+}
 
 const searchInput = document.getElementById('sInput');
 const clearBtn = document.getElementById('sClear');
 const statsEl = document.getElementById('searchStats');
 
-async function executeSearch(filter) {{
-    if (allRows.length === 0) return;
-    let visibleCount = 0;
-    const sponsorToggle = document.getElementById('sponsorToggle');
-    const showSponsors = sponsorToggle ? sponsorToggle.checked : false;
-    const variants = filter ? getSearchVariants(filter) : [];
-    clearBtn.style.display = filter ? 'flex' : 'none';
-    allRows.forEach(row => {{
-        row.style.display = 'none';
-        const details = row.querySelector('details');
-        if (details) {{
-            details.open = false;
-            const tcList = details.querySelector('.tc-list');
-            if (tcList) {{ tcList.style.transition = 'none'; tcList.style.opacity = '0'; tcList.style.transform = 'translateY(-10px)'; tcList.innerHTML = ''; }}
-        }}
-    }});
-    if (!filter) {{
-        allRows.forEach(row => {{ 
-            const rowYear = row.getAttribute('data-year'); 
-            const isSponsor = row.classList.contains('sponsor');
-            if ((activeYear === 'all' || rowYear === activeYear) && (showSponsors || !isSponsor)) {{ 
-                row.style.display = ''; 
-                visibleCount++; 
-            }} 
-        }});
-        statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
-        return;
-    }}
-    const matchedIds = new Set();
-    searchIndex.forEach(item => {{
-        if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id);
-    }});
-    const isDesktop = window.innerWidth > 768;
-    allRows.forEach(row => {{
-        const vId = row.getAttribute('data-id');
-        const rowYear = row.getAttribute('data-year');
-        if (activeYear !== 'all' && rowYear !== activeYear) return;
-        if (!matchedIds.has(vId)) return;
-        const isSponsor = row.classList.contains('sponsor');
-        if (!showSponsors && isSponsor) return;
-        row.style.display = '';
-        visibleCount++;
-        if (isDesktop && filter.length >= 2) {{
+async function executeSearch(filter) {
+    try {
+        if (allRows.length === 0) return;
+        let visibleCount = 0;
+        const sponsorToggle = document.getElementById('sponsorToggle');
+        const showSponsors = sponsorToggle ? sponsorToggle.checked : false;
+        const variants = filter ? getSearchVariants(filter) : [];
+        clearBtn.style.display = filter ? 'flex' : 'none';
+        allRows.forEach(row => {
+            row.style.display = 'none';
             const details = row.querySelector('details');
-            const tcList = row.querySelector('.tc-list');
-            if (details && tcList && tcList.children.length === 0) {{
-                details.open = true;
-                renderTracklist(vId, tcList, filter);
-                animateContainer(tcList);
-                setTimeout(() => {{
-                    const mark = tcList.querySelector('mark');
-                    if (mark) {{
-                        const item = mark.closest('.tc-item');
-                        if (item) tcList.scrollTop = item.offsetTop - tcList.offsetTop - 10;
-                    }}
-                }}, 50);
-            }}
-        }}
-    }});
-    statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
-}}
+            if (details) {
+                details.open = false;
+                const tcList = details.querySelector('.tc-list');
+                if (tcList) { tcList.style.transition = 'none'; tcList.style.opacity = '0'; tcList.style.transform = 'translateY(-10px)'; tcList.innerHTML = ''; }
+            }
+        });
+        if (!filter) {
+            allRows.forEach(row => { 
+                const rowYear = row.getAttribute('data-year'); 
+                const isSponsor = row.classList.contains('sponsor');
+                if ((activeYear === 'all' || rowYear === activeYear) && (showSponsors || !isSponsor)) { 
+                    row.style.display = ''; 
+                    visibleCount++; 
+                } 
+            });
+            statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
+            return;
+        }
+        const matchedIds = new Set();
+        searchIndex.forEach(item => {
+            if (matchesWithVariants(item.norm, variants)) matchedIds.add(item.id);
+        });
+        const isDesktop = window.innerWidth > 768;
+        allRows.forEach(row => {
+            const vId = row.getAttribute('data-id');
+            const rowYear = row.getAttribute('data-year');
+            if (activeYear !== 'all' && rowYear !== activeYear) return;
+            if (!matchedIds.has(vId)) return;
+            const isSponsor = row.classList.contains('sponsor');
+            if (!showSponsors && isSponsor) return;
+            row.style.display = '';
+            visibleCount++;
+            if (isDesktop && filter.length >= 2) {
+                const details = row.querySelector('details');
+                const tcList = row.querySelector('.tc-list');
+                if (details && tcList && tcList.children.length === 0) {
+                    details.open = true;
+                    renderTracklist(vId, tcList, filter);
+                    animateContainer(tcList);
+                    setTimeout(() => {
+                        const mark = tcList.querySelector('mark');
+                        if (mark) {
+                            const item = mark.closest('.tc-item');
+                            if (item) tcList.scrollTop = item.offsetTop - tcList.offsetTop - 10;
+                        }
+                    }, 50);
+                }
+            }
+        });
+        statsEl.textContent = 'Найдено трансляций: ' + visibleCount;
+    } catch(e) {
+        console.error('Ошибка поиска:', e);
+    }
+}
 
 const scrollBtn = document.getElementById('scrollTopBtn');
-window.addEventListener('scroll', () => {{ if (window.scrollY > 300) scrollBtn.classList.add('show'); else scrollBtn.classList.remove('show'); }});
-scrollBtn.addEventListener('click', () => window.scrollTo({{ top: 0, behavior: 'smooth' }}));
+window.addEventListener('scroll', function() {
+    try {
+        if (window.scrollY > 300) {
+            if (scrollBtn) scrollBtn.classList.add('show');
+        } else {
+            if (scrollBtn) scrollBtn.classList.remove('show');
+        }
+    } catch(e) {}
+}, { passive: true });
 
-document.addEventListener('DOMContentLoaded', async () => {{
-    await loadDatabase();
-    renderAllStreams();
-    initYearFilters();
-    
-    // Показываем переключатель если есть спонсорские видео
-    const sponsorToggleLabel = document.getElementById('sponsorToggleLabel');
-    if (sponsorToggleLabel && document.querySelector('.row.sponsor')) {{
-        sponsorToggleLabel.style.display = 'flex';
-    }}
-    
-    executeSearch('');
-}});
+if (scrollBtn) {
+    scrollBtn.addEventListener('click', function() {
+        try {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch(e) {}
+    });
+}
 
-document.getElementById('mainGrid').addEventListener('click', (e) => {{
-    if (e.target.classList.contains('t-click')) {{
-        e.preventDefault();
-        const time = e.target.getAttribute('data-time');
-        const vId = e.target.closest('.row').getAttribute('data-id');
-        const parts = time.split(':').map(Number);
-        const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
-        window.open(`https://www.youtube.com/watch?v=${{vId}}&t=${{secs}}s`, '_blank');
-    }}
-}});
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await loadDatabase();
+        renderAllStreams();
+        initYearFilters();
+        
+        const sponsorToggleLabel = document.getElementById('sponsorToggleLabel');
+        if (sponsorToggleLabel && document.querySelector('.row.sponsor')) {
+            sponsorToggleLabel.style.display = 'flex';
+        }
+        
+        executeSearch('');
+    } catch(e) {
+        console.error('Ошибка инициализации:', e);
+    }
+});
+
+document.getElementById('mainGrid').addEventListener('click', (e) => {
+    try {
+        if (e.target.classList.contains('t-click')) {
+            e.preventDefault();
+            const time = e.target.getAttribute('data-time');
+            const vId = e.target.closest('.row').getAttribute('data-id');
+            const parts = time.split(':').map(Number);
+            const secs = parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
+            window.open(`https://www.youtube.com/watch?v=${vId}&t=${secs}s`, '_blank');
+        }
+    } catch(e) {}
+});
 
 let debounceTimer;
-searchInput.addEventListener('input', () => {{ clearTimeout(debounceTimer); debounceTimer = setTimeout(() => executeSearch(searchInput.value.toLowerCase().trim()), 700); }});
-clearBtn.addEventListener('click', () => {{ searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch(''); }});
+searchInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function() {
+        try {
+            executeSearch(searchInput.value.toLowerCase().trim());
+        } catch(e) {}
+    }, 700);
+});
+
+clearBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    clearBtn.style.display = 'none';
+    executeSearch('');
+});
 </script>
 </body>
 </html>"""
-
-    html_content = "\n".join(line.rstrip() for line in html_template.splitlines() if line.strip())
-    html_content = re.sub(r'>\s+<', '><', html_content)
-    html_content = re.sub(r'\n+', '\n', html_content)
-
-    with open(output_html, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    logging.info("HTML обновлён: %s", os.path.abspath(output_html))
-
-    generate_sitemap(site_url)
-
-# ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
-def run_parser():
-    args = parse_args()
-    debug_mode = args.debug if args.debug is not None else DEBUG
-    setup_logging(debug_mode)
-
-    api_key = args.api_key
-    if not api_key:
-        logging.error("API-ключ YouTube не указан. Задайте --api-key или переменную YOUTUBE_API_KEY")
-        sys.exit(1)
-
-    db = load_database(args.db)
-    is_first_run = len(db) == 0
-
-    flat_opts = {
-        'playlistend': None if is_first_run else args.new_streams,
-        'extract_flat': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-    try:
-        with YoutubeDL(flat_opts) as ydl:
-            logging.info("Получение списка трансляций через yt-dlp...")
-            channel_data = ydl.extract_info(args.channel, download=False)
-            if not channel_data or 'entries' not in channel_data:
-                logging.error("Не удалось получить список стримов.")
-                return
-
-            videos_to_parse = []
-            videos_to_fix_date = []
-            for entry in channel_data['entries']:
-                if not entry:
-                    continue
-                video_id = entry.get('id')
-                if not video_id:
-                    continue
-                if video_id in db and db[video_id].get('list_type') == 'tracklist':
-                    if db[video_id].get('raw_date', '00000000') == '00000000':
-                        raw_date = entry.get('upload_date', '00000000')
-                        videos_to_fix_date.append((video_id, raw_date))
-                    continue
-                raw_date = entry.get('upload_date', '00000000')
-                videos_to_parse.append({
-                    'id': video_id,
-                    'title': entry.get('title', 'Без названия'),
-                    'raw_date': raw_date
-                })
-
-        if videos_to_fix_date:
-            logging.info("Восстановление дат для %d существующих треклистов...", len(videos_to_fix_date))
-            for vid, raw_date in videos_to_fix_date:
-                if raw_date == '00000000':
-                    try:
-                        video_resp = SESSION.get(
-                            "https://www.googleapis.com/youtube/v3/videos",
-                            params={"key": api_key, "part": "snippet", "id": vid}
-                        ).json()
-                        if "items" in video_resp and video_resp["items"]:
-                            published_at = video_resp["items"][0]["snippet"]["publishedAt"]
-                            raw_date = published_at[:10].replace("-", "")
-                    except Exception as e:
-                        logging.warning("Не удалось восстановить дату для %s: %s", vid, e)
-                if raw_date != '00000000':
-                    with db_lock:
-                        if vid in db:
-                            db[vid]['raw_date'] = raw_date
-                            db[vid]['date'] = f"{raw_date[6:8]}.{raw_date[4:6]}.{raw_date[0:4]}"
-                            logging.info("Дата обновлена для %s: %s", vid, db[vid]['date'])
-            save_database(db, args.db)
-
-        if videos_to_parse:
-            logging.info("Парсинг %d видео...", len(videos_to_parse))
-
-            def worker(video):
-                parse_single_video(video, api_key, db, args)
-
-            with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-                executor.map(worker, videos_to_parse)
-
-            save_database(db, args.db)
-
-        # Ежемесячная проверка спонсорских видео
-        if should_run_sponsor_check():
-            logging.info("Запуск ежемесячной проверки спонсорских видео")
-
-            # Собираем все видео для проверки (tracklist и mixed)
-            videos_to_check = []
-            for video_id, video_data in db.items():
-                if video_data.get("list_type") in ("tracklist", "mixed"):
-                    videos_to_check.append(video_id)
-            
-            logging.info("Найдено %d видео с треклистами в базе", len(videos_to_check))
-            
-            if videos_to_check:
-                # Проверяем все видео пачками по 50
-                available_videos = check_sponsor_batch(videos_to_check, api_key)
-                
-                logging.info(
-                    "API вернул %d доступных видео из %d запрошенных",
-                    len(available_videos),
-                    len(videos_to_check)
-                )
-                
-                # Обновляем статусы
-                sponsors_found = 0
-                already_sponsored = 0
-                still_available = 0
-                
-                for video_id in videos_to_check:
-                    if video_id in available_videos:
-                        # Видео доступно
-                        if db[video_id].get("is_sponsor", False):
-                            logging.info("Видео перестало быть спонсорским: %s", db[video_id].get("title", video_id))
-                        db[video_id]["is_sponsor"] = False
-                        still_available += 1
-                    else:
-                        # Видео недоступно
-                        if not db[video_id].get("is_sponsor", False):
-                            sponsors_found += 1
-                            logging.info(
-                                "Видео стало спонсорским: %s",
-                                db[video_id].get("title", video_id)
-                            )
-                        else:
-                            already_sponsored += 1
-                        db[video_id]["is_sponsor"] = True
-                
-                update_sponsor_check_date()
-                
-                logging.info(
-                    "Результаты проверки: доступно=%d, стало спонсорскими=%d, уже были спонсорскими=%d",
-                    still_available,
-                    sponsors_found,
-                    already_sponsored
-                )
-            else:
-                logging.info("Нет видео для проверки")
-        else:
-            logging.info("Ежемесячная проверка спонсорских видео не требуется (прошло меньше 30 дней)")
-
-        # Сохраняем базу после проверки спонсорских видео
-        save_database(db, args.db)
-
-        logging.info("Генерация отчётов и плеера...")
-        generate_html_report(db, args.site_url, args.output, args.tracklists, args.player)
-
-    except Exception as e:
-        logging.exception("Критическая ошибка")
-        sys.exit(1)
 
 if __name__ == "__main__":
     run_parser()
