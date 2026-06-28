@@ -560,32 +560,6 @@
     </div>
 </div>
 <div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
-
-<!-- Лёгкий блокировщик рекламы (не мешает Premium) -->
-<script>
-(function() {
-    var adPatterns = [
-        'doubleclick.net',
-        'googlesyndication.com',
-        '/pagead/',
-        '/api/stats/ads'
-    ];
-    
-    var originalFetch = window.fetch;
-    window.fetch = function(url) {
-        if (typeof url === 'string') {
-            for (var i = 0; i < adPatterns.length; i++) {
-                if (url.indexOf(adPatterns[i]) !== -1) {
-                    return Promise.resolve(new Response('', {status: 200}));
-                }
-            }
-        }
-        var args = Array.prototype.slice.call(arguments);
-        return originalFetch.apply(this, args);
-    };
-})();
-</script>
-
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 // ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
@@ -985,7 +959,6 @@ function startTimeCheck() {
     checkInterval = setInterval(function() {
         if (!player || !player.getCurrentTime || !currentTrack) return;
         
-        // Авто-пропуск рекламы (не мешает Premium)
         try {
             var state = player.getPlayerState();
             var currentTime = player.getCurrentTime();

@@ -1,5 +1,5 @@
 [
-    {
+  {
     "id": "phg6asbVoaI",
     "title": "💜КВАШЕНАЯ ПОЕТ ВСЯКОЕ💜",
     "published_date": "2026-06-27",
@@ -2243,7 +2243,7 @@
       "00:44:08 - 00:46:26 ✅ (АВТОРСКАЯ) Квашеная - Каждый знает 💸",
       "00:52:15 - 00:54:04 ✅ Король и Шут - Дурак и молния ⚡🤪",
       "01:13:16 - 01:15:27 ✨ Татьяна Куртукова - Матушка 🌍❤",
-      "01:20:01 - 01:21:41 ✅ (с П) Indila - Dernière Danse 💔",
+      "01:20:01 - 01:20:41 ✅ (с П) Indila - Dernière Danse 💔",
       "01:24:24 - 01:25:32 ✅ (НОВИНКА) Братья Грим - Кустурица 🔥",
       "01:29:50 - 01:31:24 ✅ (с П) (G)I-dle - Queencard 👑",
       "01:35:45 - 01:38:17 ✨ Евгений Крылатов, Юрий Энтин - Прекрасное далёко 👍♥",
@@ -11154,7 +11154,7 @@
       "я с Сашкой, #Непьюалкоголь , 2:39:00."
     ],
     "list_type": "mixed",
-    "author": "@shungan1288, @Emperor-v6, @ajoajo701 и др.",
+    "author": "@ВладимирИванов-и7ч7и, @LumBMM, @shungan1288 и др.",
     "duration": 12271,
     "is_sponsor": false
   },
@@ -11364,19 +11364,9 @@
       "02:48:36 МакSим-Знаешь ли ты"
     ],
     "list_type": "mixed",
-    "author": "@Df-dv1ss, @anastasia_drawyt108, @ajoajo701 и др.",
+    "author": "@anastasia_drawyt108, @Df-dv1ss, @yozhikhyper1337 и др.",
     "duration": 10994,
     "is_sponsor": false
-  },
-  {
-    "id": "ICSiLpdRmoo",
-    "title": "СТРИМ⭐Квашеная ПОЁТ!👍ЧАСТЬ 1",
-    "published_date": "2021-07-31",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 2484,
-    "is_sponsor": true
   },
   {
     "id": "Vp-hDB9UDDM",
@@ -11636,16 +11626,6 @@
     "is_sponsor": true
   },
   {
-    "id": "HJN5GMpZuWQ",
-    "title": "стрим Квашеной!)))) А ПЕСНЯ ТО ВЫШЛА))",
-    "published_date": "2020-03-27",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 8075,
-    "is_sponsor": true
-  },
-  {
     "id": "BnG2qbwwYjQ",
     "title": "Квашеная Капуста онлайн!)))) Что споём?))",
     "published_date": "2020-03-15",
@@ -11676,6 +11656,16 @@
     "is_sponsor": true
   },
   {
+    "id": "glvOahYoK5U",
+    "title": "Сашка Капустина ОНЛАЙН!))) Что споём?))",
+    "published_date": "2020-01-15",
+    "timecodes": [],
+    "list_type": "none",
+    "author": "",
+    "duration": 7948,
+    "is_sponsor": true
+  },
+  {
     "id": "-R-AcP0tdIk",
     "title": "Сашка Капустина ОНЛАЙН!))) Что споём?))",
     "published_date": "2020-01-15",
@@ -11696,16 +11686,6 @@
     "is_sponsor": true
   },
   {
-    "id": "bbVqCy9RYv0",
-    "title": "СТРИМ с Квашеной 🎉",
-    "published_date": "2020-01-03",
-    "timecodes": [],
-    "list_type": "none",
-    "author": "",
-    "duration": 126,
-    "is_sponsor": true
-  },
-  {
     "id": "9yqOjHWL41E",
     "title": "СТРИМ с Квашеной 🎉",
     "published_date": "2020-01-03",
@@ -11716,13 +11696,13 @@
     "is_sponsor": true
   },
   {
-    "id": "k6Ivm4vGaqI",
-    "title": "у меня тут стрим, заходи, я тебя жду! 16 февраля 2019",
-    "published_date": "2019-02-16",
+    "id": "bbVqCy9RYv0",
+    "title": "СТРИМ с Квашеной 🎉",
+    "published_date": "2020-01-03",
     "timecodes": [],
     "list_type": "none",
     "author": "",
-    "duration": 8129,
+    "duration": 126,
     "is_sponsor": true
   }
 ]
