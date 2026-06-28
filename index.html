@@ -33,4 +33,5 @@ window.addEventListener('scroll', function() { try { if (window.scrollY > 300) {
 searchInput.addEventListener('input', function() { clearTimeout(debounceTimer); debounceTimer = setTimeout(function() { try { executeSearch(searchInput.value.toLowerCase().trim()); } catch(e) {} }, 700);
 }, { passive: true }); clearBtn.addEventListener('click', function() { searchInput.value = ''; clearBtn.style.display = 'none'; executeSearch('');
 }, { passive: true });
+  
 </script></body></html>
