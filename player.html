@@ -377,102 +377,6 @@
             cursor: pointer;
             border: 2px solid white;
         }
-        .sponsor-toggle-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 4px 0;
-            margin-top: 2px;
-            display: none;
-            cursor: help;
-            position: relative;
-        }
-        .sponsor-toggle-container.visible {
-            display: flex;
-        }
-        .sponsor-toggle-container .tooltip-text {
-            visibility: hidden;
-            opacity: 0;
-            width: 260px;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(12px);
-            color: var(--text-secondary);
-            text-align: center;
-            padding: 10px 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            font-size: 12px;
-            line-height: 1.5;
-            position: absolute;
-            bottom: calc(100% + 12px);
-            left: 0;
-            transform: translateX(0);
-            transition: opacity 0.25s ease, visibility 0.25s ease;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-            z-index: 100;
-            pointer-events: none;
-            font-weight: 400;
-        }
-        .sponsor-toggle-container .tooltip-text::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 20px;
-            transform: translateX(0);
-            border: 6px solid transparent;
-            border-top-color: rgba(15, 23, 42, 0.95);
-        }
-        .sponsor-toggle-container:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-        .sponsor-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
-            margin: 0;
-        }
-        .sponsor-toggle .toggle-switch {
-            width: 36px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            position: relative;
-            transition: background 0.3s;
-            flex-shrink: 0;
-            display: inline-block;
-        }
-        .sponsor-toggle .toggle-switch::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 16px;
-            height: 16px;
-            background: #94a3b8;
-            border-radius: 50%;
-            transition: all 0.3s;
-        }
-        .sponsor-toggle input:checked + .toggle-switch {
-            background: var(--primary);
-        }
-        .sponsor-toggle input:checked + .toggle-switch::after {
-            left: 18px;
-            background: white;
-        }
-        .sponsor-toggle input {
-            display: none !important;
-        }
-        .sponsor-toggle .sponsor-label {
-            font-size: 13px;
-            font-weight: 500;
-            letter-spacing: 0.2px;
-            white-space: nowrap;
-        }
         .playlist-section {
             background: rgba(255, 255, 255, 0.02);
             border-radius: 16px;
@@ -575,16 +479,6 @@
             .ctrl-btn.play-btn { width: 56px; height: 56px; }
             .ctrl-btn svg { width: 20px; height: 20px; }
             .ctrl-btn.play-btn svg { width: 24px; height: 24px; }
-            .sponsor-toggle-container .tooltip-text {
-                width: 200px;
-                font-size: 11px;
-                padding: 8px 12px;
-                left: 0;
-                transform: translateX(0);
-            }
-            .sponsor-toggle-container .tooltip-text::after {
-                left: 20px;
-            }
         }
     </style>
 </head>
@@ -650,14 +544,6 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" id="volumeWaves"></path></svg>
         </div>
         <input type="range" id="volumeSlider" min="0" max="100" value="100" title="Громкость">
-    </div>
-    <div class="sponsor-toggle-container" id="sponsorToggleContainer">
-        <span class="tooltip-text">Данные стримы будут доступны, если вы являетесь спонсором YouTube-канала Саши Капустиной.</span>
-        <label class="sponsor-toggle" id="playerSponsorToggleLabel">
-            <input type="checkbox" id="playerSponsorToggle" onchange="toggleSponsorFilter()">
-            <span class="toggle-switch"></span>
-            <span class="sponsor-label">Спонсорские видео</span>
-        </label>
     </div>
     <div class="playlist-section" id="playlistSection">
         <div class="playlist-header" id="playlistHeader">
@@ -754,7 +640,6 @@ var volumeWaves = document.getElementById('volumeWaves');
 var playlistSection = document.getElementById('playlistSection');
 var playlistHeader = document.getElementById('playlistHeader');
 var trackList = document.getElementById('trackList');
-var sponsorToggleContainer = document.getElementById('sponsorToggleContainer');
 
 artworkImage.onload = onArtworkLoad;
 artworkImage.onerror = onArtworkError;
@@ -778,8 +663,6 @@ var pendingAutoplay = false;
 var wasMuted = false;
 var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 var isChromeIOS = /CriOS/.test(navigator.userAgent);
-var showSponsors = false;
-var sponsorVideoIds = new Set();
 
 function parseTimecodeRange(line) {
     var re = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
@@ -888,72 +771,18 @@ function forcePlay(retries) {
     }
 }
 
-function toggleSponsorFilter() {
-    var checkbox = document.getElementById('playerSponsorToggle');
-    showSponsors = checkbox ? checkbox.checked : false;
-    rebuildFilteredList();
-    if (currentList.length > 0) {
-        var idx = 0;
-        if (currentTrack) {
-            for (var i = 0; i < currentList.length; i++) {
-                if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) {
-                    idx = i;
-                    break;
-                }
-            }
-        }
-        if (idx >= currentList.length) idx = 0;
-        playTrackAtIndex(Math.min(idx, currentList.length - 1));
-    } else if (filteredTrackList.length > 0) {
-        playTrackAtIndex(0);
-    }
-}
-
-function rebuildFilteredList() {
-    var source = isShuffled ? shuffledList : masterTrackList;
-    if (showSponsors) {
-        filteredTrackList = source.slice();
-    } else {
-        filteredTrackList = [];
-        for (var i = 0; i < source.length; i++) {
-            if (!sponsorVideoIds.has(source[i].videoId)) {
-                filteredTrackList.push(source[i]);
-            }
-        }
-    }
-    currentList = filteredTrackList.slice();
-}
-
-function updateSponsorToggleVisibility() {
-    var hasSponsorTracks = false;
-    for (var i = 0; i < masterTrackList.length; i++) {
-        if (masterTrackList[i].isSponsor) {
-            hasSponsorTracks = true;
-            break;
-        }
-    }
-    if (hasSponsorTracks) {
-        sponsorToggleContainer.classList.add('visible');
-    } else {
-        sponsorToggleContainer.classList.remove('visible');
-    }
-}
-
 function init() {
     fetch('parsed_streams_db.json')
         .then(function(resp) { return resp.json(); })
         .then(function(db) {
             var items = Array.isArray(db) ? db : Object.values(db);
             masterTrackList = [];
-            sponsorVideoIds = new Set();
             
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
+                // Пропускаем спонсорские видео
+                if (item.is_sponsor) continue;
                 if (!item.timecodes || (item.list_type !== 'tracklist' && item.list_type !== 'mixed')) continue;
-                var isSponsor = item.is_sponsor || false;
-                if (isSponsor) {
-                    sponsorVideoIds.add(item.id);
-                }
                 for (var j = 0; j < item.timecodes.length; j++) {
                     var parsed = parseTimecodeRange(item.timecodes[j]);
                     if (parsed.start == null) continue;
@@ -968,18 +797,14 @@ function init() {
                         thumbnail: 'https://img.youtube.com/vi/' + item.id + '/hqdefault.jpg',
                         url: 'https://www.youtube.com/watch?v=' + item.id + '&t=' + parsed.start + 's',
                         videoDuration: item.duration || 0,
-                        hasEnd: parsed.end !== null,
-                        isSponsor: isSponsor
+                        hasEnd: parsed.end !== null
                     });
                 }
             }
             
             shuffledList = masterTrackList.slice();
-            showSponsors = false;
-            document.getElementById('playerSponsorToggle').checked = false;
-            rebuildFilteredList();
+            currentList = masterTrackList.slice();
             updateShuffleButton();
-            updateSponsorToggleVisibility();
             
             if (currentList.length > 0) {
                 if (playerReady) playTrackAtIndex(0);
@@ -1216,7 +1041,7 @@ function shuffleTracks() {
         }
         shuffledList = masterTrackList.slice();
         isShuffled = false;
-        rebuildFilteredList();
+        currentList = shuffledList.slice();
         if (idx !== -1 && idx < currentList.length) playTrackAtIndex(idx);
         else if (currentList.length > 0) playTrackAtIndex(0);
     } else {
@@ -1226,7 +1051,7 @@ function shuffleTracks() {
             var temp = shuffledList[i]; shuffledList[i] = shuffledList[j]; shuffledList[j] = temp;
         }
         isShuffled = true;
-        rebuildFilteredList();
+        currentList = shuffledList.slice();
         if (currentList.length > 0) playTrackAtIndex(0);
     }
     updateShuffleButton();
