@@ -584,6 +584,11 @@
 <div id="ytplayer" style="position:absolute;width:1px;height:1px;opacity:0.01;pointer-events:none;"></div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// ===== ПЕРЕМЕННЫЕ СОСТОЯНИЯ =====
+var consecutiveErrors = 0;
+var maxConsecutiveErrors = 5;
+var errorSkipTimeout = null;
+
 // ===== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ =====
 function formatDateForDisplay(dateStr) {
     try {
@@ -793,6 +798,80 @@ function forcePlay(retries) {
     }
 }
 
+function handleVideoError() {
+    if (!currentTrack || !currentList.length) return;
+    
+    consecutiveErrors++;
+    console.warn('Видео недоступно (ошибка #' + consecutiveErrors + '): ' + currentTrack.title + ' (' + currentTrack.videoId + ')');
+    
+    // Показываем сообщение в интерфейсе
+    var errorMsg = consecutiveErrors > 1 
+        ? '⚠️ Пропущено ' + consecutiveErrors + ' недоступных видео'
+        : '⚠️ Видео недоступно, пропускаем...';
+    trackTitle.querySelector('span').textContent = errorMsg;
+    streamInfo.querySelector('span').textContent = currentTrack.streamTitle;
+    
+    // Если слишком много ошибок подряд — останавливаемся
+    if (consecutiveErrors >= maxConsecutiveErrors) {
+        trackTitle.querySelector('span').textContent = '⚠️ Слишком много недоступных видео';
+        streamInfo.querySelector('span').textContent = 'Проверьте соединение или VPN';
+        isPlaying = false;
+        playIcon.style.display = '';
+        pauseIcon.style.display = 'none';
+        playingIndicator.classList.remove('active');
+        artworkContainer.classList.remove('playing');
+        consecutiveErrors = 0;
+        return;
+    }
+    
+    // Сбрасываем флаг switchingTrack, чтобы skipCurrentTrack мог отработать
+    switchingTrack = false;
+    pendingAutoplay = false;
+    
+    // Пропускаем текущий трек
+    clearTimeout(errorSkipTimeout);
+    errorSkipTimeout = setTimeout(function() {
+        skipCurrentTrack();
+    }, 800);
+}
+
+function skipCurrentTrack() {
+    if (!currentList.length || !currentTrack) return;
+    
+    var idx = -1;
+    for (var i = 0; i < currentList.length; i++) {
+        if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) { 
+            idx = i; 
+            break; 
+        }
+    }
+    
+    if (idx === -1) {
+        // Если трек не найден в списке, пробуем следующий
+        if (currentList.length > 0) {
+            playTrackAtIndex(0);
+        }
+        return;
+    }
+    
+    var nextIdx = (idx + 1) % currentList.length;
+    
+    // Если мы обошли весь список и вернулись к тому же треку — значит все видео недоступны
+    if (nextIdx === idx && consecutiveErrors >= currentList.length) {
+        trackTitle.querySelector('span').textContent = '⚠️ Все видео недоступны';
+        streamInfo.querySelector('span').textContent = 'Попробуйте позже или используйте VPN';
+        isPlaying = false;
+        playIcon.style.display = '';
+        pauseIcon.style.display = 'none';
+        playingIndicator.classList.remove('active');
+        artworkContainer.classList.remove('playing');
+        consecutiveErrors = 0;
+        return;
+    }
+    
+    playTrackAtIndex(nextIdx);
+}
+
 function init() {
     fetch('parsed_streams_db.json')
         .then(function(resp) { return resp.json(); })
@@ -856,9 +935,14 @@ window.onYouTubeIframeAPIReady = function() {
                 onStateChange: onPlayerStateChange,
                 onError: function(event) {
                     console.warn('YouTube player error:', event.data);
+                    // 2 - неверный параметр, 5 - ошибка HTML5 плеера, 
+                    // 100 - видео не найдено/удалено, 101/150 - запрещено встраивание/региональные ограничения
                     if (event.data === 100 || event.data === 101 || event.data === 150) {
+                        handleVideoError();
+                    } else {
+                        // Для других ошибок пробуем перезагрузить видео через 2 секунды
                         setTimeout(function() {
-                            if (currentTrack) {
+                            if (currentTrack && player && playerReady) {
                                 player.loadVideoById({
                                     videoId: currentTrack.videoId,
                                     startSeconds: currentTrack.start
@@ -905,6 +989,8 @@ function onPlayerStateChange(event) {
     
     if (state === YT.PlayerState.PLAYING) {
         pendingAutoplay = false;
+        consecutiveErrors = 0;
+        switchingTrack = false;
         isPlaying = true;
         playIcon.style.display = 'none';
         pauseIcon.style.display = '';
@@ -923,28 +1009,34 @@ function onPlayerStateChange(event) {
         artworkContainer.classList.remove('playing');
         playingIndicator.classList.remove('active');
     } else if (state === YT.PlayerState.ENDED) {
-        if (!switchingTrack) {
-            if (isRepeating) {
-                if (currentTrack && player && playerReady) {
-                    player.seekTo(currentTrack.start);
-                    setTimeout(function() {
-                        player.playVideo();
-                    }, 300);
-                }
-            } else {
-                nextTrack();
+        switchingTrack = false;
+        if (isRepeating) {
+            if (currentTrack && player && playerReady) {
+                player.seekTo(currentTrack.start);
+                setTimeout(function() {
+                    player.playVideo();
+                }, 300);
             }
+        } else {
+            nextTrack();
         }
     }
 }
 
 function playTrackAtIndex(index) {
     if (!currentList.length || !player || !playerReady) return;
+    
+    consecutiveErrors = 0;
+    clearTimeout(errorSkipTimeout);
+    switchingTrack = true;
+    pendingAutoplay = true;
+    
     var newTrack = currentList[index];
     
     if (currentTrack && currentTrack.videoId === newTrack.videoId && currentTrack.start === newTrack.start) {
         currentTrack = newTrack;
         updateTrackUI();
+        switchingTrack = false;
         player.seekTo(currentTrack.start, true);
         if (isPlaying || isChromeIOS) {
             setTimeout(function() {
@@ -958,7 +1050,6 @@ function playTrackAtIndex(index) {
     
     currentTrack = newTrack;
     updateTrackUI();
-    pendingAutoplay = true;
     
     player.loadVideoById({
         videoId: currentTrack.videoId,
@@ -1032,15 +1123,27 @@ function togglePlayPause() {
 }
 
 function nextTrack() {
-    if (switchingTrack || !currentList.length || !currentTrack) return;
+    if (!currentList.length || !currentTrack) return;
+    if (switchingTrack) {
+        // Если уже переключаем, ждём и пробуем снова
+        setTimeout(function() { nextTrack(); }, 200);
+        return;
+    }
+    
     switchingTrack = true;
     var idx = -1;
     for (var i = 0; i < currentList.length; i++) {
-        if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) { idx = i; break; }
+        if (currentList[i].videoId === currentTrack.videoId && currentList[i].start === currentTrack.start) { 
+            idx = i; 
+            break; 
+        }
     }
-    if (idx === -1) { switchingTrack = false; return; }
+    if (idx === -1) { 
+        switchingTrack = false; 
+        return; 
+    }
     playTrackAtIndex((idx + 1) % currentList.length);
-    setTimeout(function() { switchingTrack = false; }, 1000);
+    setTimeout(function() { switchingTrack = false; }, 1500);
 }
 
 function prevTrack() {
@@ -1077,6 +1180,8 @@ function shuffleTracks() {
         if (currentList.length > 0) playTrackAtIndex(0);
     }
     updateShuffleButton();
+    consecutiveErrors = 0;
+    clearTimeout(errorSkipTimeout);
 }
 
 function updateShuffleButton() {
